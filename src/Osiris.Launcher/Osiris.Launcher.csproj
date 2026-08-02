@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net462</TargetFramework>
+    <AssemblyName>Osiris</AssemblyName>
+    <RootNamespace>Osiris</RootNamespace>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <ApplicationIcon>..\..\assets\Osiris.ico</ApplicationIcon>
+  </PropertyGroup>
+</Project>

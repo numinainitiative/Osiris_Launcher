@@ -30,9 +30,13 @@ The package is written to `artifacts/`, which is excluded from Git. See
 
 The personal installation under `G:\Gaming\Apps` is never a build source. See
 [`docs/ENVIRONMENTS.md`](docs/ENVIRONMENTS.md) for the environment boundaries.
+The current development inputs and their deployed outputs are recorded in
+[`docs/SOURCE-BUILD-MAP.md`](docs/SOURCE-BUILD-MAP.md).
 
 ## Current status
 
-The repository and packaging boundary are being established. Automatic update
-checks, signed packages, unattended publishing, and the production installer
-are not implemented yet.
+The inherited Playnite program update check is disabled and enforced by the
+release builder. Osiris now contains its own GitHub Releases updater with
+checksum validation, `Data` preservation, and rollback. Public repository
+publication, code signing, unattended publishing, and the production installer
+still require completion.

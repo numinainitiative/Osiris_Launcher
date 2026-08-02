@@ -37,6 +37,11 @@ $sourceRootPath = Get-FullPath $SourceRoot
 $outputRoot = Get-FullPath $OutputDirectory
 $sourceApp = Join-Path $sourceRootPath 'App'
 $versionFile = Join-Path $repositoryRoot 'version.json'
+$programUpdateTool = Join-Path $repositoryRoot 'tools\DisablePlayniteProgramUpdates\DisablePlayniteProgramUpdates.csproj'
+$osirisUpdaterProject = Join-Path $repositoryRoot 'updater\Osiris.Updater.csproj'
+$osirisUpdaterOutput = Join-Path $repositoryRoot 'updater\bin\Release\net462\Osiris.Updater.exe'
+$osirisLauncherProject = Join-Path $repositoryRoot 'src\Osiris.Launcher\Osiris.Launcher.csproj'
+$osirisLauncherOutput = Join-Path $repositoryRoot 'src\Osiris.Launcher\bin\Release\net462\Osiris.exe'
 
 if (-not (Test-Path -LiteralPath (Join-Path $sourceRootPath 'Osiris.exe') -PathType Leaf) -or
     -not (Test-Path -LiteralPath $sourceApp -PathType Container)) {
@@ -45,6 +50,38 @@ if (-not (Test-Path -LiteralPath (Join-Path $sourceRootPath 'Osiris.exe') -PathT
 
 if (-not (Test-Path -LiteralPath $versionFile -PathType Leaf)) {
     throw "Version metadata is missing: $versionFile"
+}
+
+$sourcePlayniteAssembly = Join-Path $sourceApp 'Playnite.dll'
+if (-not (Test-Path -LiteralPath $sourcePlayniteAssembly -PathType Leaf)) {
+    throw "The Playnite core assembly is missing: $sourcePlayniteAssembly"
+}
+
+if (-not (Test-Path -LiteralPath $programUpdateTool -PathType Leaf)) {
+    throw "The Playnite program-update verification tool is missing: $programUpdateTool"
+}
+
+if (-not (Test-Path -LiteralPath $osirisUpdaterProject -PathType Leaf)) {
+    throw "The Osiris updater project is missing: $osirisUpdaterProject"
+}
+
+if (-not (Test-Path -LiteralPath $osirisLauncherProject -PathType Leaf)) {
+    throw "The Osiris launcher project is missing: $osirisLauncherProject"
+}
+
+& dotnet build $osirisLauncherProject --configuration Release --verbosity minimal
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $osirisLauncherOutput -PathType Leaf)) {
+    throw 'Release validation failed; the Osiris launcher could not be built.'
+}
+
+& dotnet build $osirisUpdaterProject --configuration Release --verbosity minimal
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $osirisUpdaterOutput -PathType Leaf)) {
+    throw 'Release validation failed; the Osiris updater could not be built.'
+}
+
+& dotnet run --project $programUpdateTool --configuration Release -- --verify $sourcePlayniteAssembly
+if ($LASTEXITCODE -ne 0) {
+    throw 'Release validation failed; inherited Playnite program updates are not disabled.'
 }
 
 $versionMetadata = Get-Content -LiteralPath $versionFile -Raw | ConvertFrom-Json
@@ -111,12 +148,38 @@ if ($robocopyExitCode -gt 7) {
     throw "Robocopy failed with exit code $robocopyExitCode."
 }
 
+Copy-Item -LiteralPath $osirisUpdaterOutput -Destination (Join-Path $destinationApp 'Osiris.Updater.exe') -Force
+
+$commonConfigPath = Join-Path $destinationApp 'Common.config'
+if (-not (Test-Path -LiteralPath $commonConfigPath -PathType Leaf)) {
+    throw 'Release validation failed; App/Common.config is missing.'
+}
+[xml]$commonConfig = Get-Content -LiteralPath $commonConfigPath -Raw
+foreach ($setting in @{
+    UpdateUrl = 'about:blank'
+    UpdateUrl2 = 'about:blank'
+    UpdateBranch = 'disabled'
+}.GetEnumerator()) {
+    $node = $commonConfig.appSettings.add |
+        Where-Object { $_.key -eq $setting.Key } |
+        Select-Object -First 1
+    if ($null -eq $node) {
+        throw "Release validation failed; Common.config is missing $($setting.Key)."
+    }
+    $node.value = $setting.Value
+}
+$commonConfig.Save($commonConfigPath)
+
 foreach ($fileName in @('Osiris.exe', 'README.txt', 'Uninstall Osiris.exe')) {
     $sourceFile = Join-Path $sourceRootPath $fileName
     if (Test-Path -LiteralPath $sourceFile -PathType Leaf) {
         Copy-Item -LiteralPath $sourceFile -Destination (Join-Path $packageRoot $fileName)
     }
 }
+
+Copy-Item -LiteralPath $osirisLauncherOutput -Destination (Join-Path $packageRoot 'Osiris.exe') -Force
+
+Copy-Item -LiteralPath $versionFile -Destination (Join-Path $packageRoot 'version.json')
 
 New-Item -ItemType Directory -Path (Join-Path $packageRoot 'Data') | Out-Null
 
@@ -133,6 +196,12 @@ if ($stagedDataItems.Count -ne 0) {
 
 if (-not (Test-Path -LiteralPath (Join-Path $destinationApp 'license.txt') -PathType Leaf)) {
     throw 'Release validation failed; App/license.txt is missing.'
+}
+
+$stagedCommonConfig = Get-Content -LiteralPath $commonConfigPath -Raw
+if ($stagedCommonConfig -match 'playnite\.link/update' -or
+    $stagedCommonConfig -notmatch 'key="UpdateBranch" value="disabled"') {
+    throw 'Release validation failed; the inherited Playnite update channel is still configured.'
 }
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem

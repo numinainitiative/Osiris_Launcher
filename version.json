@@ -2,5 +2,7 @@
   "version": "0.1.0-alpha.1",
   "channel": "alpha",
   "repositoryOwner": "numinainitiative",
-  "repositoryName": "Osiris_Launcher"
+  "repositoryName": "Osiris_Launcher",
+  "releaseApiUrl": "https://api.github.com/repos/numinainitiative/Osiris_Launcher/releases",
+  "checkForUpdates": true
 }
