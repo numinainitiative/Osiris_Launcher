@@ -1,0 +1,29 @@
+# Local release outputs
+/artifacts/
+/release/
+/staging/
+
+# Never commit a live Osiris profile or installation copy
+/Data/
+/App/
+*.zip
+*.7z
+*.exe
+*.msi
+*.msix
+
+# .NET and Visual Studio outputs
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+
+# Local tooling and operating-system files
+.idea/
+.vscode/
+*.tmp
+*.log
+Thumbs.db
+Desktop.ini
+
