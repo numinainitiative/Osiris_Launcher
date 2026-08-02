@@ -8,7 +8,7 @@ SHA-256:
 `e76da3a699cb17d27e2e160f74dfa8b4a66c04cc74b9767f986474d0d9c93d4c`
 
 Test location:
-`C:\Development\Osiris Launcher Project\tmp\Clean Install Tests\Osiris-0.1.0-alpha.1`
+`C:\Development\Osiris Launcher\Programming\Temp\Clean Install Tests\Osiris-0.1.0-alpha.1`
 
 ### Passed
 
@@ -40,4 +40,3 @@ Osiris must not be publicly released while it can update from the upstream
 Playnite channel. The built-in update check must be disabled or redirected to a
 Numina Initiative-controlled Osiris release endpoint and tested before the first
 public package is published.
-

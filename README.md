@@ -18,8 +18,8 @@ live installation or any user's `Data` directory.
 
 ## Build a local release candidate
 
-The initial release builder reads the isolated development sandbox located at
-`..\Sandboxes\Development\Osiris` and creates a sanitized package:
+The initial release builder reads the isolated programming installation located
+at `..\..\Programming\Development\Osiris` and creates a sanitized package:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build\New-OsirisRelease.ps1

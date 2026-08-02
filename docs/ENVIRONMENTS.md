@@ -15,7 +15,7 @@ Path: `G:\Gaming\Apps\Osiris Launcher App`
 
 ## Local Git repository
 
-Path: `C:\Development\Osiris Launcher Project\Osiris_Launcher`
+Path: `C:\Development\Osiris Launcher\GitHub\Osiris_Launcher`
 
 - Authoritative source, build scripts, installer, updater, version metadata, and
   release documentation.
@@ -24,7 +24,7 @@ Path: `C:\Development\Osiris Launcher Project\Osiris_Launcher`
 
 ## Development sandbox
 
-Path: `C:\Development\Osiris Launcher Project\Sandboxes\Development\Osiris`
+Path: `C:\Development\Osiris Launcher\Programming\Development\Osiris`
 
 - Receives rapid local development builds.
 - Uses a persistent but disposable demo `Data` profile.
@@ -34,7 +34,7 @@ Path: `C:\Development\Osiris Launcher Project\Sandboxes\Development\Osiris`
 
 ## Clean-install sandbox
 
-Path: `C:\Development\Osiris Launcher Project\Sandboxes\CleanInstall`
+Path: `C:\Development\Osiris Launcher\Programming\CleanInstall`
 
 - Recreated from a release package for each release candidate.
 - Begins with an empty `Data` directory.
@@ -42,7 +42,7 @@ Path: `C:\Development\Osiris Launcher Project\Sandboxes\CleanInstall`
 
 ## Upgrade-test sandbox
 
-Path: `C:\Development\Osiris Launcher Project\Sandboxes\UpgradeTest`
+Path: `C:\Development\Osiris Launcher\Programming\UpgradeTest`
 
 - Starts from the previous published version with disposable demo data.
 - Receives the candidate through the real updater.
@@ -51,7 +51,7 @@ Path: `C:\Development\Osiris Launcher Project\Sandboxes\UpgradeTest`
 
 ## Demo profile seed
 
-Path: `C:\Development\Osiris Launcher Project\Sandboxes\Profiles\DemoSeed`
+Path: `C:\Development\Osiris Launcher\Programming\Profiles\DemoSeed`
 
 - Holds a deliberately non-personal baseline used to reset sandbox profiles.
 - Must contain no copied personal library, credentials, browser state, or logs.
