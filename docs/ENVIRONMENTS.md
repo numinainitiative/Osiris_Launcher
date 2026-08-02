@@ -64,4 +64,3 @@ Path: `C:\Development\Osiris Launcher Project\Sandboxes\Profiles\DemoSeed`
 4. Publish a GitHub prerelease for the personal acceptance installation.
 5. Use the candidate for several days.
 6. Publish the tested commit and reproducible build to the stable channel.
-
