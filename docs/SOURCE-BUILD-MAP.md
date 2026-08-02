@@ -13,13 +13,13 @@ to that installation; paths in this document are relative to
 | Development input | Produced or patched artifact | Deployed destination | Status |
 | --- | --- | --- | --- |
 | `DecompiledDesktopEngine/Osiris.DesktopEngine.csproj` | `bin/Release/net462/Playnite.DesktopApp.exe` | `App/Osiris.DesktopEngine.exe` | Active decompiled desktop source. Builds successfully after redirecting its references to the programming installation. Not yet in Git. |
-| `ThemeSource/Code/OsirisTheme.csproj` | `media-build/OsirisTheme.dll` | `App/OsirisTheme.dll` | Active. The output and deployed assembly matched by SHA-256 during this audit. Two scripts deploy it after the app releases the file. |
+| `ThemeSource/Code/OsirisTheme.csproj` | `media-build/OsirisTheme.dll` | `App/OsirisTheme.dll` and `App/Themes/Desktop/Default/OsirisTheme.dll` | Active. Both deployed copies must remain synchronized; the App-root copy is the assembly loaded by the desktop engine. |
 | `Launchers/OsirisHardBoundLauncher.cs` | `OsirisHardBoundLauncher.exe` | `App/Osiris.DesktopApp.exe` and `App/Osiris.FullscreenApp.exe` | Active. Both deployed launchers matched the development executable by SHA-256. They force each installation to use its root `Data` directory. |
 | `OsirisLauncher.cs` | root launcher | `Osiris.exe` | Migrated to `src/Osiris.Launcher` in the authoritative repository. The release builder now compiles it and embeds the repository-owned Osiris icon. |
 | `Tools/OsirisPortableUninstaller.cs` | portable uninstaller | `Uninstall Osiris.exe` | Active source, but compilation and resource-patching steps are not orchestrated. |
 | `Tools/OsirisArtworkNormalizer.csproj` | `Osiris.ArtworkNormalizer.exe` | `App/Osiris.ArtworkNormalizer.exe` | Active; build output matched the deployed tool by SHA-256. |
 | Core and SDK patchers under `Tools/` | patched `Playnite.dll`, `Playnite.SDK.dll`, launcher, and selected extension assemblies | corresponding files under `App/` and `Data/Extensions/` | Active transformations, but their input versions and execution order are not captured in one build script. |
-| `OsirisGallery/source/Generic/SteamScreenshots` | Game Gallery extension | `Data/Extensions/Enhancements/GameGallery_...` | Active legacy extension work in a nested repository with preserved local modifications. The private `numinainitiative/Osiris_Extensions` repository is now the migration target, but the editable source has not yet been moved. It remains excluded from the normal public package. |
+| `GitHub/Extensions/extensions/GameGallery/source` | standalone Game Gallery extension | `Data/Extensions/Enhancements/GameGallery_...` | Migrated to the private `numinainitiative/Osiris_Extensions` repository as version 2.0.0. It builds into an independently versioned `.pext` package; extension-private caches live under the matching `ExtensionsData/Enhancements` folder. The legacy nested repository remains preserved as upstream history/reference. |
 | Loose XAML files at `Development/Development (AI)` | directly copied theme/control overrides | `App/Themes/Desktop/Default/...` and other theme paths | Partially traceable. `ComboBox.xaml`, `ListBox.xaml`, `ListView.xaml`, `Menu.xaml`, and `ScrollViewer.xaml` matched deployed files; other loose copies are stale or ambiguous. The release builder synchronizes the bottom-right footer label in `MainWindow.xaml` with `version.json`. |
 | `Build-Release.ps1` | legacy sanitized directory copy | development-only `Release/` output | Superseded by the authoritative `build/New-OsirisRelease.ps1`. |
 
@@ -88,5 +88,5 @@ builder verifies the patch before it copies any runtime files.
 4. Identify or reconstruct the active fullscreen-engine source.
 5. Consolidate direct XAML/theme overlays so each deployed file has one
    authoritative source.
-6. Keep the modified OsirisGallery repository isolated until its changes are
-   reviewed and deliberately migrated.
+6. Migrate the remaining extension sources with the same provenance, license,
+   packaging, and clean-install verification used for Game Gallery.
