@@ -16,6 +16,20 @@ live installation or any user's `Data` directory.
 - Each installation keeps its own writable `Data` directory. An update must
   replace application files without replacing or uploading user data.
 
+## Install a GitHub release manually
+
+1. Open the repository's [Releases](https://github.com/numinainitiative/Osiris_Launcher/releases) page.
+2. Download the ZIP named `Osiris-<version>-win-x64.zip`. Do not download the
+   GitHub-generated **Source code** archives; those do not contain the runnable
+   Osiris application.
+3. Extract the ZIP into a new folder where the current Windows user can write,
+   then run `Osiris.exe`.
+
+The first launch creates the installation's private `Data` profile. The current
+prerelease is portable and does not yet include a conventional installer. See
+[`docs/MANUAL-INSTALL.md`](docs/MANUAL-INSTALL.md) for verification and private
+repository limitations.
+
 ## Build a local release candidate
 
 The initial release builder reads the isolated programming installation located
