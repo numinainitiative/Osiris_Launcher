@@ -58,7 +58,7 @@ namespace Osiris.Updater
                 return 0;
             }
 
-            var currentVersion = SemanticVersion.Parse(configuration.version);
+            var currentVersion = OsirisVersion.Parse(configuration.version);
             var useConfiguredApi = string.IsNullOrWhiteSpace(options.ApiUrl);
             if (useConfiguredApi && WasCheckedRecently(root))
             {
@@ -92,7 +92,7 @@ namespace Osiris.Updater
                 return 0;
             }
 
-            var releaseVersion = SemanticVersion.Parse(latestRelease.tag_name.TrimStart('v', 'V'));
+            var releaseVersion = ParseReleaseVersion(latestRelease.tag_name);
             var expectedManifestName = "Osiris-" + releaseVersion + "-win-x64.json";
             var manifestAsset = latestRelease.assets == null
                 ? null
@@ -269,7 +269,7 @@ namespace Osiris.Updater
 
         private static ReleaseInfo SelectLatestRelease(
             IEnumerable<ReleaseInfo> releases,
-            SemanticVersion currentVersion,
+            OsirisVersion currentVersion,
             string channel)
         {
             var allowPrereleases = !string.Equals(channel, "stable", StringComparison.OrdinalIgnoreCase);
@@ -280,21 +280,51 @@ namespace Osiris.Updater
                     Release = release,
                     Version = TryParseReleaseVersion(release.tag_name)
                 })
-                .Where(item => item.Version != null && item.Version.CompareTo(currentVersion) > 0)
+                .Where(item => item.Version != null &&
+                    IsStageAllowed(item.Version.Stage, channel) &&
+                    item.Version.CompareTo(currentVersion) > 0)
                 .OrderByDescending(item => item.Version)
                 .Select(item => item.Release)
                 .FirstOrDefault();
         }
 
-        private static SemanticVersion TryParseReleaseVersion(string tag)
+        private static bool IsStageAllowed(string stage, string channel)
         {
-            SemanticVersion version;
-            return SemanticVersion.TryParse((tag ?? string.Empty).TrimStart('v', 'V'), out version)
+            if (string.Equals(channel, "stable", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Equals(stage, "Stable", StringComparison.OrdinalIgnoreCase);
+            }
+            if (string.Equals(channel, "beta", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.Equals(stage, "Alpha", StringComparison.OrdinalIgnoreCase);
+            }
+            return true;
+        }
+
+        private static OsirisVersion ParseReleaseVersion(string tag)
+        {
+            var value = (tag ?? string.Empty).Trim();
+            if (value.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+            {
+                value = value.Substring(1);
+            }
+            return OsirisVersion.Parse(value);
+        }
+
+        private static OsirisVersion TryParseReleaseVersion(string tag)
+        {
+            OsirisVersion version;
+            var value = (tag ?? string.Empty).Trim();
+            if (value.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+            {
+                value = value.Substring(1);
+            }
+            return OsirisVersion.TryParse(value, out version)
                 ? version
                 : null;
         }
 
-        private static void ValidateManifest(ReleaseManifest manifest, SemanticVersion releaseVersion)
+        private static void ValidateManifest(ReleaseManifest manifest, OsirisVersion releaseVersion)
         {
             if (manifest == null || manifest.schemaVersion != 1 ||
                 !string.Equals(manifest.version, releaseVersion.ToString(), StringComparison.OrdinalIgnoreCase) ||
@@ -581,79 +611,70 @@ namespace Osiris.Updater
         }
     }
 
-    internal sealed class SemanticVersion : IComparable<SemanticVersion>
+    internal sealed class OsirisVersion : IComparable<OsirisVersion>
     {
-        public int Major;
+        public string Stage;
+        public int Year;
         public int Minor;
-        public int Patch;
-        public string Prerelease;
+        public int Revision;
 
-        public static SemanticVersion Parse(string value)
+        public static OsirisVersion Parse(string value)
         {
-            SemanticVersion version;
-            if (!TryParse(value, out version)) throw new FormatException("Invalid semantic version: " + value);
+            OsirisVersion version;
+            if (!TryParse(value, out version)) throw new FormatException("Invalid Osiris version: " + value);
             return version;
         }
 
-        public static bool TryParse(string value, out SemanticVersion version)
+        public static bool TryParse(string value, out OsirisVersion version)
         {
             version = null;
-            if (string.IsNullOrWhiteSpace(value) || !Regex.IsMatch(
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            var match = Regex.Match(
                 value,
-                @"^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$",
-                RegexOptions.CultureInvariant)) return false;
-            var coreAndPre = value.Split(new[] { '-' }, 2);
-            var parts = coreAndPre[0].Split('.');
-            int major, minor, patch;
-            if (parts.Length != 3 || !int.TryParse(parts[0], out major) ||
-                !int.TryParse(parts[1], out minor) || !int.TryParse(parts[2], out patch)) return false;
-            version = new SemanticVersion
+                @"^(Alpha|Beta|Stable)_(\d+)\.(\d+)\.(\d+)$",
+                RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+            if (!match.Success) return false;
+            int year, minor, revision;
+            if (!int.TryParse(match.Groups[2].Value, out year) ||
+                !int.TryParse(match.Groups[3].Value, out minor) ||
+                !int.TryParse(match.Groups[4].Value, out revision)) return false;
+            version = new OsirisVersion
             {
-                Major = major,
+                Stage = CanonicalStage(match.Groups[1].Value),
+                Year = year,
                 Minor = minor,
-                Patch = patch,
-                Prerelease = coreAndPre.Length == 2 ? coreAndPre[1] : null
+                Revision = revision
             };
             return true;
         }
 
-        public int CompareTo(SemanticVersion other)
+        public int CompareTo(OsirisVersion other)
         {
             if (other == null) return 1;
-            var result = Major.CompareTo(other.Major);
+            var result = Year.CompareTo(other.Year);
             if (result == 0) result = Minor.CompareTo(other.Minor);
-            if (result == 0) result = Patch.CompareTo(other.Patch);
-            if (result != 0) return result;
-            if (Prerelease == null && other.Prerelease != null) return 1;
-            if (Prerelease != null && other.Prerelease == null) return -1;
-            return ComparePrerelease(Prerelease, other.Prerelease);
+            if (result == 0) result = Revision.CompareTo(other.Revision);
+            if (result == 0) result = StageRank(Stage).CompareTo(StageRank(other.Stage));
+            return result;
         }
 
-        private static int ComparePrerelease(string left, string right)
+        private static string CanonicalStage(string stage)
         {
-            if (left == null && right == null) return 0;
-            var leftParts = left.Split('.');
-            var rightParts = right.Split('.');
-            for (var index = 0; index < Math.Max(leftParts.Length, rightParts.Length); index++)
-            {
-                if (index >= leftParts.Length) return -1;
-                if (index >= rightParts.Length) return 1;
-                int leftNumber, rightNumber;
-                var leftNumeric = int.TryParse(leftParts[index], out leftNumber);
-                var rightNumeric = int.TryParse(rightParts[index], out rightNumber);
-                int result;
-                if (leftNumeric && rightNumeric) result = leftNumber.CompareTo(rightNumber);
-                else if (leftNumeric) result = -1;
-                else if (rightNumeric) result = 1;
-                else result = string.Compare(leftParts[index], rightParts[index], StringComparison.OrdinalIgnoreCase);
-                if (result != 0) return result;
-            }
-            return 0;
+            if (string.Equals(stage, "alpha", StringComparison.OrdinalIgnoreCase)) return "Alpha";
+            if (string.Equals(stage, "beta", StringComparison.OrdinalIgnoreCase)) return "Beta";
+            return "Stable";
+        }
+
+        private static int StageRank(string stage)
+        {
+            if (string.Equals(stage, "Alpha", StringComparison.OrdinalIgnoreCase)) return 0;
+            if (string.Equals(stage, "Beta", StringComparison.OrdinalIgnoreCase)) return 1;
+            return 2;
         }
 
         public override string ToString()
         {
-            return Major + "." + Minor + "." + Patch + (string.IsNullOrEmpty(Prerelease) ? string.Empty : "-" + Prerelease);
+            return Stage + "_" + Year + "." + Minor + "." + Revision;
         }
     }
 

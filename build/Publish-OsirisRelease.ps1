@@ -11,7 +11,7 @@ $versionMetadata = Get-Content -LiteralPath (Join-Path $repositoryRoot 'version.
 $version = [string]$versionMetadata.version
 $owner = [string]$versionMetadata.repositoryOwner
 $repository = [string]$versionMetadata.repositoryName
-$tag = "v$version"
+$tag = $version
 $packageName = "Osiris-$version-win-x64.zip"
 $manifestName = "Osiris-$version-win-x64.json"
 $packagePath = Join-Path $ArtifactDirectory $packageName
@@ -64,7 +64,7 @@ $notes = if (-not [string]::IsNullOrWhiteSpace($ReleaseNotesFile)) {
 else {
     "Osiris $version"
 }
-$isPrerelease = [string]$versionMetadata.channel -ne 'stable' -or $version.Contains('-')
+$isPrerelease = [string]$versionMetadata.channel -ne 'stable'
 $payload = [ordered]@{
     tag_name = $tag
     target_commitish = 'main'

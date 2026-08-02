@@ -86,8 +86,12 @@ if ($LASTEXITCODE -ne 0) {
 
 $versionMetadata = Get-Content -LiteralPath $versionFile -Raw | ConvertFrom-Json
 $version = [string]$versionMetadata.version
-if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
-    throw "Invalid semantic version in version.json: $version"
+if ($version -cnotmatch '^(Alpha|Beta|Stable)_\d+\.\d+\.\d+$') {
+    throw "Invalid Osiris version in version.json: $version"
+}
+$versionStage = $version.Split('_')[0].ToLowerInvariant()
+if ($versionStage -ne ([string]$versionMetadata.channel).ToLowerInvariant()) {
+    throw "Osiris version stage '$versionStage' does not match channel '$($versionMetadata.channel)'."
 }
 
 if ($outputRoot.StartsWith($sourceRootPath + '\', [StringComparison]::OrdinalIgnoreCase) -or

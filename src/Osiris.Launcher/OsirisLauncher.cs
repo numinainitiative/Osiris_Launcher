@@ -10,8 +10,8 @@ using System.Text.RegularExpressions;
 [assembly: AssemblyDescription("Numina Initiative Osiris launcher")]
 [assembly: AssemblyCompany("Numina Initiative")]
 [assembly: AssemblyProduct("Osiris")]
-[assembly: AssemblyVersion("0.1.0.0")]
-[assembly: AssemblyFileVersion("0.1.0.0")]
+[assembly: AssemblyVersion("2026.0.30.0")]
+[assembly: AssemblyFileVersion("2026.0.30.0")]
 
 internal static class OsirisLauncher
 {
@@ -468,5 +468,4 @@ internal static class OsirisLauncher
         return 0;
     }
 }
-
 

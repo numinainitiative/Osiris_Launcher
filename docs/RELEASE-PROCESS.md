@@ -4,7 +4,7 @@ This is the bootstrap release process while automated publishing and the
 production installer are still being implemented.
 
 1. Update and test the working Osiris installation.
-2. Change `version.json` to a new semantic version.
+2. Change `version.json` to the new Osiris version.
 3. Run `build/New-OsirisRelease.ps1`.
 4. Inspect the generated manifest and SHA-256 checksum.
 5. Install the package in a clean test directory and test first launch.
@@ -26,7 +26,7 @@ future fully rebuilt Osiris core. Osiris's own updater is independent of it.
 
 ## GitHub release contract
 
-- Tag: `v<version>`, for example `v0.1.0-alpha.2`.
+- Tag: the exact version, for example `Beta_2026.0.30`.
 - ZIP asset: `Osiris-<version>-win-x64.zip`.
 - Manifest asset: `Osiris-<version>-win-x64.json`.
 - Alpha and beta releases are GitHub prereleases. Stable releases are not.
@@ -39,5 +39,7 @@ permission and add `-Publish`. Draft-first publishing is recommended.
 
 ## Versioning
 
-Osiris uses semantic versions. During private testing the channel is `alpha`,
-starting with `0.1.0-alpha.1`. Stable releases will use versions such as `1.0.0`.
+Osiris versions use `<Stage>_<Year>.<Series>.<Revision>`. The accepted stages
+are `Alpha`, `Beta`, and `Stable`. The current version is `Beta_2026.0.30`; the
+next routine beta update should be `Beta_2026.0.31`. GitHub tags and release
+asset names must preserve the exact capitalization and punctuation.

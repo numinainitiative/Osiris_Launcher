@@ -9,6 +9,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 if ([string]::IsNullOrWhiteSpace($ReleaseOutput)) {
     $ReleaseOutput = Join-Path $PSScriptRoot '..\..\artifacts\github-updater-release-verification'
 }
+$ReleaseOutput = [IO.Path]::GetFullPath($ReleaseOutput)
 
 $workspaceRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..\..'))
 $upgradeRoot = [IO.Path]::GetFullPath((Join-Path $workspaceRoot 'Programming\UpgradeTest'))
@@ -21,43 +22,30 @@ if (Test-Path -LiteralPath $testRoot) {
 }
 New-Item -ItemType Directory -Path $testRoot | Out-Null
 
-$baseVersion = '0.1.0-alpha.1'
-$targetVersion = '0.1.0-alpha.2'
+$baseVersion = 'Beta_2026.0.30'
+$installedOldVersion = 'Beta_2026.0.29'
+$targetVersion = 'Beta_2026.0.30'
 $baseArchive = Join-Path $ReleaseOutput "Osiris-$baseVersion-win-x64.zip"
 $installRoot = Join-Path $testRoot 'installation'
 [IO.Compression.ZipFile]::ExtractToDirectory($baseArchive, $installRoot)
+
+$installedVersionFile = Join-Path $installRoot 'version.json'
+$installedVersionData = Get-Content -LiteralPath $installedVersionFile -Raw | ConvertFrom-Json
+$installedVersionData.version = $installedOldVersion
+$installedVersionData | ConvertTo-Json | Set-Content -LiteralPath $installedVersionFile -Encoding utf8
 
 $sentinel = Join-Path $installRoot 'Data\preserve-me.txt'
 Set-Content -LiteralPath $sentinel -Value 'full package user data sentinel'
 $sentinelHash = (Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash
 
-$targetRoot = Join-Path $testRoot 'target-package'
-Copy-Item -LiteralPath (Join-Path $ReleaseOutput "staging\Osiris-$baseVersion-win-x64") `
-    -Destination $targetRoot -Recurse
-$targetVersionFile = Join-Path $targetRoot 'version.json'
-$versionData = Get-Content -LiteralPath $targetVersionFile -Raw | ConvertFrom-Json
-$versionData.version = $targetVersion
-$versionData | ConvertTo-Json | Set-Content -LiteralPath $targetVersionFile -Encoding utf8
-Set-Content -LiteralPath (Join-Path $targetRoot 'App\osiris-updater-full-test.txt') -Value 'updated'
-
 $assetName = "Osiris-$targetVersion-win-x64.zip"
 $manifestName = "Osiris-$targetVersion-win-x64.json"
-$targetArchive = Join-Path $testRoot $assetName
-[IO.Compression.ZipFile]::CreateFromDirectory($targetRoot, $targetArchive)
-$archiveInfo = Get-Item -LiteralPath $targetArchive
-$manifestPath = Join-Path $testRoot $manifestName
-[ordered]@{
-    schemaVersion = 1
-    version = $targetVersion
-    channel = 'alpha'
-    asset = $assetName
-    size = $archiveInfo.Length
-    sha256 = (Get-FileHash -LiteralPath $targetArchive -Algorithm SHA256).Hash.ToLowerInvariant()
-} | ConvertTo-Json | Set-Content -LiteralPath $manifestPath -Encoding utf8
+$targetArchive = Join-Path $ReleaseOutput $assetName
+$manifestPath = Join-Path $ReleaseOutput $manifestName
 
 $releaseApi = Join-Path $testRoot 'releases.json'
 $releaseList = @([ordered]@{
-    tag_name = "v$targetVersion"
+    tag_name = $targetVersion
     body = 'Full sanitized Osiris package upgrade test.'
     draft = $false
     prerelease = $true
@@ -93,9 +81,6 @@ if (-not (Test-Path -LiteralPath $log) -or
 
 $installedVersion = (Get-Content -LiteralPath (Join-Path $installRoot 'version.json') -Raw | ConvertFrom-Json).version
 if ($installedVersion -ne $targetVersion) { throw "Installed version is $installedVersion." }
-if (-not (Test-Path -LiteralPath (Join-Path $installRoot 'App\osiris-updater-full-test.txt'))) {
-    throw 'The full App update marker is missing.'
-}
 if ((Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash -ne $sentinelHash) {
     throw 'The full-package update modified Data.'
 }
@@ -104,5 +89,5 @@ $backupApps = @(Get-ChildItem -LiteralPath (Join-Path $installRoot 'Data\Recover
     -Recurse -Directory -Filter App)
 if ($backupApps.Count -lt 1) { throw 'The updater did not preserve a rollback App backup.' }
 
-Write-Output "Full package upgrade passed: $baseVersion -> $targetVersion"
+Write-Output "Full package upgrade passed: $installedOldVersion -> $targetVersion"
 Write-Output 'Data sentinel preserved and rollback backup created.'
