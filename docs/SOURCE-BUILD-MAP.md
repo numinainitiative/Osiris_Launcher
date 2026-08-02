@@ -19,7 +19,7 @@ to that installation; paths in this document are relative to
 | `Tools/OsirisPortableUninstaller.cs` | portable uninstaller | `Uninstall Osiris.exe` | Active source, but compilation and resource-patching steps are not orchestrated. |
 | `Tools/OsirisArtworkNormalizer.csproj` | `Osiris.ArtworkNormalizer.exe` | `App/Osiris.ArtworkNormalizer.exe` | Active; build output matched the deployed tool by SHA-256. |
 | Core and SDK patchers under `Tools/` | patched `Playnite.dll`, `Playnite.SDK.dll`, launcher, and selected extension assemblies | corresponding files under `App/` and `Data/Extensions/` | Active transformations, but their input versions and execution order are not captured in one build script. |
-| `OsirisGallery/source/Generic/SteamScreenshots` | Steam Screenshots extension | `Data/Extensions/...` | Active optional extension work in a nested repository with preserved local modifications. It is excluded from the normal public package. |
+| `OsirisGallery/source/Generic/SteamScreenshots` | Game Gallery extension | `Data/Extensions/Enhancements/GameGallery_...` | Active legacy extension work in a nested repository with preserved local modifications. The private `numinainitiative/Osiris_Extensions` repository is now the migration target, but the editable source has not yet been moved. It remains excluded from the normal public package. |
 | Loose XAML files at `Development/Development (AI)` | directly copied theme/control overrides | `App/Themes/Desktop/Default/...` and other theme paths | Partially traceable. `ComboBox.xaml`, `ListBox.xaml`, `ListView.xaml`, `Menu.xaml`, and `ScrollViewer.xaml` matched deployed files; other loose copies are stale or ambiguous. The release builder synchronizes the bottom-right footer label in `MainWindow.xaml` with `version.json`. |
 | `Build-Release.ps1` | legacy sanitized directory copy | development-only `Release/` output | Superseded by the authoritative `build/New-OsirisRelease.ps1`. |
 
@@ -27,6 +27,15 @@ The inherited `App/Osiris.FullscreenEngine.exe` and several runtime binaries
 have no confirmed editable source in the active workspace. Decompiled and
 diagnostic folders that do not currently produce a deployed file are reference
 material, not authoritative build inputs.
+
+## Extension repository boundary
+
+Osiris extension source, catalog metadata, license records, packaging, and
+extension-specific releases belong in the separate private repository at
+`GitHub/Extensions` (`numinainitiative/Osiris_Extensions`). Installed packages
+under either installation's `Data/Extensions` are deployed test/runtime copies,
+not source inputs. Private extension settings under `ExtensionsData` must never
+enter either repository or a release package.
 
 ## Fresh-install presentation defaults
 
