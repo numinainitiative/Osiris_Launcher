@@ -28,6 +28,25 @@ have no confirmed editable source in the active workspace. Decompiled and
 diagnostic folders that do not currently produce a deployed file are reference
 material, not authoritative build inputs.
 
+## Fresh-install presentation defaults
+
+The active desktop-engine source applies Osiris presentation defaults only when
+the profile has no configured database path, before `DesktopAppViewModel` is
+created. This keeps first launch safe while leaving all later user changes
+editable and persistent. The current baseline is:
+
+- 20-pixel details-list icons;
+- 214-pixel grid width, 2:3 cover ratio, zero card margin, and 20-pixel spacing;
+- no grid-card background and no window background image;
+- the sidebar menu button remains in its normal position;
+- Vertical grid mode with Eight units on a new library; Horizontal mode starts
+  with Three units the first time it is selected.
+
+The grid-style and grid-size controls remain visible. Their selections are
+stored independently in `Data/Settings/Osiris/libraryState.ini`; `Data` is never
+used as a release build source, and no files from it are included in the public
+release payload.
+
 ## Inherited Playnite program-update path
 
 `App/Common.config` configures Playnite's primary and secondary update roots and
