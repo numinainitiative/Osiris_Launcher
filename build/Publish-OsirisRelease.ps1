@@ -59,7 +59,7 @@ if ($null -ne $existingRelease) {
 }
 
 $notes = if (-not [string]::IsNullOrWhiteSpace($ReleaseNotesFile)) {
-    Get-Content -LiteralPath $ReleaseNotesFile -Raw
+    [IO.File]::ReadAllText([IO.Path]::GetFullPath($ReleaseNotesFile))
 }
 else {
     "Osiris $version"
