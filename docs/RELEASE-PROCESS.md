@@ -17,8 +17,10 @@ The first public release will not be published until the updater can reliably
 detect a newer release, verify its package, replace only application files, and
 recover from a failed update.
 
+The inherited Playnite update check is a release blocker. It must be disabled or
+redirected to the Numina Initiative Osiris channel before publication.
+
 ## Versioning
 
 Osiris uses semantic versions. During private testing the channel is `alpha`,
 starting with `0.1.0-alpha.1`. Stable releases will use versions such as `1.0.0`.
-
