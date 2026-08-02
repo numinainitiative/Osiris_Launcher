@@ -23,3 +23,7 @@ installation must preserve that profile.
 No package may be published until it passes the builder's validation and is
 installed and launched successfully in a clean test location.
 
+The personal installation at `G:\Gaming\Apps\Osiris Launcher App` is an
+acceptance-testing installation only. Build scripts must never read from it or
+write to it.
+

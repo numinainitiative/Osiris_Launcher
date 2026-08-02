@@ -8,7 +8,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
-    $SourceRoot = Join-Path $PSScriptRoot '..\..\Osiris Launcher App'
+    $SourceRoot = Join-Path $PSScriptRoot '..\..\Sandboxes\Development\Osiris'
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {

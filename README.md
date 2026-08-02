@@ -18,8 +18,8 @@ live installation or any user's `Data` directory.
 
 ## Build a local release candidate
 
-The initial release builder reads the working installation located beside this
-repository and creates a sanitized package:
+The initial release builder reads the isolated development sandbox located at
+`..\Sandboxes\Development\Osiris` and creates a sanitized package:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build\New-OsirisRelease.ps1
@@ -28,9 +28,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build\New-OsirisRelease.ps
 The package is written to `artifacts/`, which is excluded from Git. See
 [`docs/RELEASE-PROCESS.md`](docs/RELEASE-PROCESS.md) before publishing anything.
 
+The personal installation under `G:\Gaming\Apps` is never a build source. See
+[`docs/ENVIRONMENTS.md`](docs/ENVIRONMENTS.md) for the environment boundaries.
+
 ## Current status
 
 The repository and packaging boundary are being established. Automatic update
 checks, signed packages, unattended publishing, and the production installer
 are not implemented yet.
-
