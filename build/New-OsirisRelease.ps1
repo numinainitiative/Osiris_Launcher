@@ -174,6 +174,24 @@ foreach ($setting in @{
 }
 $commonConfig.Save($commonConfigPath)
 
+$themeMainWindowPath = Join-Path $destinationApp 'Themes\Desktop\Default\Views\MainWindow.xaml'
+if (-not (Test-Path -LiteralPath $themeMainWindowPath -PathType Leaf)) {
+    throw 'Release validation failed; the Osiris desktop theme MainWindow.xaml is missing.'
+}
+$footerStage = $version.Split('_')[0].ToUpperInvariant()
+$footerNumber = $version.Substring($version.IndexOf('_') + 1)
+$themeMainWindow = Get-Content -LiteralPath $themeMainWindowPath -Raw
+$footerStagePattern = '(?<=<TextBlock Text=")(?:ALPHA|BETA|STABLE)(?=")'
+$footerNumberPattern = '(?<=<TextBlock Text=")\d+\.\d+\.\d+(?=")'
+$footerStageMatches = [regex]::Matches($themeMainWindow, $footerStagePattern)
+$footerNumberMatches = [regex]::Matches($themeMainWindow, $footerNumberPattern)
+if ($footerStageMatches.Count -ne 1 -or $footerNumberMatches.Count -ne 1) {
+    throw "Release validation failed; expected one styled Osiris footer version label."
+}
+$themeMainWindow = [regex]::Replace($themeMainWindow, $footerStagePattern, $footerStage)
+$themeMainWindow = [regex]::Replace($themeMainWindow, $footerNumberPattern, $footerNumber)
+Set-Content -LiteralPath $themeMainWindowPath -Value $themeMainWindow -Encoding utf8
+
 foreach ($fileName in @('Osiris.exe', 'README.txt', 'Uninstall Osiris.exe')) {
     $sourceFile = Join-Path $sourceRootPath $fileName
     if (Test-Path -LiteralPath $sourceFile -PathType Leaf) {
@@ -206,6 +224,12 @@ $stagedCommonConfig = Get-Content -LiteralPath $commonConfigPath -Raw
 if ($stagedCommonConfig -match 'playnite\.link/update' -or
     $stagedCommonConfig -notmatch 'key="UpdateBranch" value="disabled"') {
     throw 'Release validation failed; the inherited Playnite update channel is still configured.'
+}
+
+$stagedThemeMainWindow = Get-Content -LiteralPath $themeMainWindowPath -Raw
+if ($stagedThemeMainWindow -notmatch ('Text="' + [regex]::Escape($footerStage) + '"') -or
+    $stagedThemeMainWindow -notmatch ('Text="' + [regex]::Escape($footerNumber) + '"')) {
+    throw 'Release validation failed; the desktop footer version does not match version.json.'
 }
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
