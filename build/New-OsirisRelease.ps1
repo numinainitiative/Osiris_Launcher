@@ -132,7 +132,7 @@ $excludedAppFiles = @(
     'backup.json', 'config.json', 'fullscreenConfig.json', 'libraryState.ini',
     'osiris-font-size.json', 'osiris-game-details-settings.json',
     'osiris-grid-view-settings.json', 'osiris-ui-settings.json',
-    'osiris-ui-theme.json', 'windowPositions.json'
+    'osiris-ui-theme.json', 'windowPositions.json', '*.bak', '*.tmp', '*~'
 )
 
 $excludedDirectoryPaths = @($excludedAppDirectories | ForEach-Object {

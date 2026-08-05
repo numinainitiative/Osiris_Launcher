@@ -120,17 +120,17 @@ function Wait-ForLogText {
 }
 
 $installRoot = Join-Path $testRoot 'installation'
-New-TestInstallation -Root $installRoot -Version 'Beta_2026.0.29' -Marker 'old'
+New-TestInstallation -Root $installRoot -Version 'Beta_2026.0.30' -Marker 'old'
 $sentinel = Join-Path $installRoot 'Data\preserve-me.txt'
 Set-Content -LiteralPath $sentinel -Value 'personal data must survive'
 $sentinelHash = (Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash
 
-$successApi = New-TestRelease -Version 'Beta_2026.0.30' -Marker 'updated'
+$successApi = New-TestRelease -Version 'Beta_2026.0.31' -Marker 'updated'
 Invoke-UpdateCheck -InstallRoot $installRoot -ReleaseApi $successApi
-Wait-ForLogText -InstallRoot $installRoot -Text 'Installed Osiris Beta_2026.0.30'
+Wait-ForLogText -InstallRoot $installRoot -Text 'Installed Osiris Beta_2026.0.31'
 
 $installedVersion = (Get-Content -LiteralPath (Join-Path $installRoot 'version.json') -Raw | ConvertFrom-Json).version
-if ($installedVersion -ne 'Beta_2026.0.30') { throw "Unexpected installed version: $installedVersion" }
+if ($installedVersion -ne 'Beta_2026.0.31') { throw "Unexpected installed version: $installedVersion" }
 if ((Get-Content -LiteralPath (Join-Path $installRoot 'App\release-marker.txt') -Raw).Trim() -ne 'updated') {
     throw 'The new App payload was not installed.'
 }
@@ -139,12 +139,12 @@ if ((Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash -ne $sentinelHa
 }
 
 New-Item -ItemType Directory -Path (Join-Path $installRoot 'blocked.txt') | Out-Null
-$failureApi = New-TestRelease -Version 'Beta_2026.0.31' -Marker 'must-rollback' -ForceApplyFailure
+$failureApi = New-TestRelease -Version 'Beta_2026.0.32' -Marker 'must-rollback' -ForceApplyFailure
 Invoke-UpdateCheck -InstallRoot $installRoot -ReleaseApi $failureApi
 Wait-ForLogText -InstallRoot $installRoot -Text 'Rollback completed.'
 
 $rolledBackVersion = (Get-Content -LiteralPath (Join-Path $installRoot 'version.json') -Raw | ConvertFrom-Json).version
-if ($rolledBackVersion -ne 'Beta_2026.0.30') { throw "Rollback left version $rolledBackVersion" }
+if ($rolledBackVersion -ne 'Beta_2026.0.31') { throw "Rollback left version $rolledBackVersion" }
 if ((Get-Content -LiteralPath (Join-Path $installRoot 'App\release-marker.txt') -Raw).Trim() -ne 'updated') {
     throw 'Rollback did not restore the previous App payload.'
 }
@@ -153,6 +153,6 @@ if ((Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash -ne $sentinelHa
 }
 
 Write-Output 'Updater integration test passed:'
-Write-Output '  Beta_2026.0.29 -> Beta_2026.0.30 installed'
+Write-Output '  Beta_2026.0.30 -> Beta_2026.0.31 installed'
 Write-Output '  Data sentinel preserved'
-Write-Output '  forced Beta_2026.0.31 failure rolled back to Beta_2026.0.30'
+Write-Output '  forced Beta_2026.0.32 failure rolled back to Beta_2026.0.31'

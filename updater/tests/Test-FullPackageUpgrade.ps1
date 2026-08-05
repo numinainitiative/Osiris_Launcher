@@ -12,8 +12,8 @@ if ([string]::IsNullOrWhiteSpace($ReleaseOutput)) {
 $ReleaseOutput = [IO.Path]::GetFullPath($ReleaseOutput)
 
 $workspaceRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..\..'))
-$upgradeRoot = [IO.Path]::GetFullPath((Join-Path $workspaceRoot 'Programming\UpgradeTest'))
-$testRoot = [IO.Path]::GetFullPath((Join-Path $upgradeRoot 'GitHubUpdater-20260802'))
+$upgradeRoot = [IO.Path]::GetFullPath((Join-Path $workspaceRoot 'Programming\Sandbox\UpgradeTest'))
+$testRoot = [IO.Path]::GetFullPath((Join-Path $upgradeRoot 'GitHubUpdater-Beta_2026.0.31'))
 if (-not $testRoot.StartsWith($upgradeRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
     throw 'Unsafe upgrade-test path.'
 }
@@ -23,8 +23,8 @@ if (Test-Path -LiteralPath $testRoot) {
 New-Item -ItemType Directory -Path $testRoot | Out-Null
 
 $baseVersion = 'Beta_2026.0.30'
-$installedOldVersion = 'Beta_2026.0.29'
-$targetVersion = 'Beta_2026.0.30'
+$installedOldVersion = 'Beta_2026.0.30'
+$targetVersion = 'Beta_2026.0.31'
 $baseArchive = Join-Path $ReleaseOutput "Osiris-$baseVersion-win-x64.zip"
 $installRoot = Join-Path $testRoot 'installation'
 [IO.Compression.ZipFile]::ExtractToDirectory($baseArchive, $installRoot)

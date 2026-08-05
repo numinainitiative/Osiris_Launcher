@@ -40,6 +40,6 @@ permission and add `-Publish`. Draft-first publishing is recommended.
 ## Versioning
 
 Osiris versions use `<Stage>_<Year>.<Series>.<Revision>`. The accepted stages
-are `Alpha`, `Beta`, and `Stable`. The current version is `Beta_2026.0.30`; the
-next routine beta update should be `Beta_2026.0.31`. GitHub tags and release
+are `Alpha`, `Beta`, and `Stable`. The current version is `Beta_2026.0.31`; the
+next routine beta update should be `Beta_2026.0.32`. GitHub tags and release
 asset names must preserve the exact capitalization and punctuation.
