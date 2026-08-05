@@ -1,11 +1,14 @@
 [CmdletBinding()]
 param(
-    [string]$ArtifactDirectory = (Join-Path $PSScriptRoot '..\artifacts'),
+    [string]$ArtifactDirectory,
     [string]$ReleaseNotesFile,
     [switch]$Publish
 )
 
 $ErrorActionPreference = 'Stop'
+if ([string]::IsNullOrWhiteSpace($ArtifactDirectory)) {
+    $ArtifactDirectory = Join-Path $PSScriptRoot '..\artifacts'
+}
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $versionMetadata = Get-Content -LiteralPath (Join-Path $repositoryRoot 'version.json') -Raw | ConvertFrom-Json
 $version = [string]$versionMetadata.version
