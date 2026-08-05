@@ -614,9 +614,9 @@ namespace Osiris.Updater
     internal sealed class OsirisVersion : IComparable<OsirisVersion>
     {
         public string Stage;
-        public int Year;
+        public int Major;
         public int Minor;
-        public int Revision;
+        public int Patch;
 
         public static OsirisVersion Parse(string value)
         {
@@ -634,16 +634,16 @@ namespace Osiris.Updater
                 @"^(Alpha|Beta|Stable)_(\d+)\.(\d+)\.(\d+)$",
                 RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
             if (!match.Success) return false;
-            int year, minor, revision;
-            if (!int.TryParse(match.Groups[2].Value, out year) ||
+            int major, minor, patch;
+            if (!int.TryParse(match.Groups[2].Value, out major) ||
                 !int.TryParse(match.Groups[3].Value, out minor) ||
-                !int.TryParse(match.Groups[4].Value, out revision)) return false;
+                !int.TryParse(match.Groups[4].Value, out patch)) return false;
             version = new OsirisVersion
             {
                 Stage = CanonicalStage(match.Groups[1].Value),
-                Year = year,
+                Major = major,
                 Minor = minor,
-                Revision = revision
+                Patch = patch
             };
             return true;
         }
@@ -651,11 +651,25 @@ namespace Osiris.Updater
         public int CompareTo(OsirisVersion other)
         {
             if (other == null) return 1;
-            var result = Year.CompareTo(other.Year);
+
+            // Beta_2026.x.x was Osiris's short-lived calendar-style scheme.
+            // Any conventional version is newer than a legacy calendar version,
+            // allowing installations bootstrapped with this updater to migrate to
+            // Beta_1.x.x and then resume normal semantic version comparison.
+            var legacy = IsLegacyCalendarVersion();
+            var otherLegacy = other.IsLegacyCalendarVersion();
+            if (legacy != otherLegacy) return legacy ? -1 : 1;
+
+            var result = Major.CompareTo(other.Major);
             if (result == 0) result = Minor.CompareTo(other.Minor);
-            if (result == 0) result = Revision.CompareTo(other.Revision);
+            if (result == 0) result = Patch.CompareTo(other.Patch);
             if (result == 0) result = StageRank(Stage).CompareTo(StageRank(other.Stage));
             return result;
+        }
+
+        private bool IsLegacyCalendarVersion()
+        {
+            return Major >= 2000 && Major <= 2999;
         }
 
         private static string CanonicalStage(string stage)
@@ -674,7 +688,7 @@ namespace Osiris.Updater
 
         public override string ToString()
         {
-            return Stage + "_" + Year + "." + Minor + "." + Revision;
+            return Stage + "_" + Major + "." + Minor + "." + Patch;
         }
     }
 

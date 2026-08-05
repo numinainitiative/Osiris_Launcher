@@ -26,7 +26,7 @@ future fully rebuilt Osiris core. Osiris's own updater is independent of it.
 
 ## GitHub release contract
 
-- Tag: the exact version, for example `Beta_2026.0.30`.
+- Tag: the exact version, for example `Beta_1.0.31`.
 - ZIP asset: `Osiris-<version>-win-x64.zip`.
 - Manifest asset: `Osiris-<version>-win-x64.json`.
 - Alpha and beta releases are GitHub prereleases. Stable releases are not.
@@ -39,7 +39,13 @@ permission and add `-Publish`. Draft-first publishing is recommended.
 
 ## Versioning
 
-Osiris versions use `<Stage>_<Year>.<Series>.<Revision>`. The accepted stages
-are `Alpha`, `Beta`, and `Stable`. The current version is `Beta_2026.0.31`; the
-next routine beta update should be `Beta_2026.0.32`. GitHub tags and release
-asset names must preserve the exact capitalization and punctuation.
+Osiris versions use `<Stage>_<Major>.<Minor>.<Patch>`. The accepted stages are
+`Alpha`, `Beta`, and `Stable`. The current version is `Beta_1.0.31`; the next
+routine beta update should be `Beta_1.0.32`. GitHub tags and release asset names
+must preserve the exact capitalization and punctuation.
+
+The retired `Beta_2026.x.x` calendar-style versions remain immutable historical
+releases. Because their shipped updater compares the first numeric component
+literally, those installations require one manual installation of
+`Beta_1.0.31`; the conventional updater then handles all future updates and
+treats `Beta_1.x.x` as newer than the legacy scheme.
