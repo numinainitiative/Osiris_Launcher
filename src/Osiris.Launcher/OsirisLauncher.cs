@@ -2,19 +2,27 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 
 [assembly: AssemblyTitle("Osiris")]
 [assembly: AssemblyDescription("Numina Initiative Osiris launcher")]
 [assembly: AssemblyCompany("Numina Initiative")]
 [assembly: AssemblyProduct("Osiris")]
-[assembly: AssemblyVersion("1.0.31.0")]
-[assembly: AssemblyFileVersion("1.0.31.0")]
+[assembly: AssemblyVersion("1.0.32.0")]
+[assembly: AssemblyFileVersion("1.0.32.0")]
 
 internal static class OsirisLauncher
 {
+    private const string ExtensionDataRemovalQueueFileName = "osiris-extension-data-removals.txt";
+    private const string ExtensionInstallQueueDirectoryName = "osiris-extension-install-queue";
+    private const long MaximumExtensionPackageBytes = 256L * 1024L * 1024L;
+    private const int MaximumExtensionPackageFiles = 2048;
+
     private static string Quote(string value)
     {
         if (string.IsNullOrEmpty(value))
@@ -29,6 +37,17 @@ internal static class OsirisLauncher
     {
         for (var index = 0; index < (args == null ? 0 : args.Length); index++)
         {
+            if (string.Equals(args[index], "--waitforpid", StringComparison.OrdinalIgnoreCase))
+            {
+                index++;
+                continue;
+            }
+
+            if (args[index].StartsWith("--waitforpid=", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             if (string.Equals(args[index], "--userdatadir", StringComparison.OrdinalIgnoreCase))
             {
                 index++;
@@ -46,6 +65,51 @@ internal static class OsirisLauncher
             }
 
             yield return Quote(args[index]);
+        }
+    }
+
+    private static bool WaitForRequestedProcess(string[] args)
+    {
+        var processId = 0;
+        for (var index = 0; index < (args == null ? 0 : args.Length); index++)
+        {
+            if (string.Equals(args[index], "--waitforpid", StringComparison.OrdinalIgnoreCase))
+            {
+                if (index + 1 < args.Length)
+                {
+                    int.TryParse(args[index + 1], out processId);
+                }
+                break;
+            }
+
+            const string prefix = "--waitforpid=";
+            if (args[index].StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                int.TryParse(args[index].Substring(prefix.Length), out processId);
+                break;
+            }
+        }
+
+        if (processId <= 0 || processId == Process.GetCurrentProcess().Id)
+        {
+            return true;
+        }
+
+        try
+        {
+            using (var process = Process.GetProcessById(processId))
+            {
+                return process.WaitForExit(60000);
+            }
+        }
+        catch (ArgumentException)
+        {
+            // The requested process already exited before the launcher opened it.
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -280,6 +344,650 @@ internal static class OsirisLauncher
         RemoveDirectoryIfEmpty(Path.Combine(dataDir, "config"));
     }
 
+    private static bool IsExtensionCategory(string value)
+    {
+        return string.Equals(value, "Libraries", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(value, "Metadata", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(value, "Enhancements", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(value, "Utilities", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryResolveQueuedExtensionDataDirectory(
+        string extensionsDataRoot,
+        string queuedRelativePath,
+        out string targetDirectory)
+    {
+        targetDirectory = null;
+        if (string.IsNullOrWhiteSpace(queuedRelativePath) || Path.IsPathRooted(queuedRelativePath))
+        {
+            return false;
+        }
+
+        var segments = queuedRelativePath.Trim().Split(new[]
+        {
+            Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar
+        }, StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length != 2 ||
+            !IsExtensionCategory(segments[0]) ||
+            segments.Any(segment => segment == "." || segment == ".."))
+        {
+            return false;
+        }
+
+        var identifierSeparator = segments[1].LastIndexOf('_');
+        Guid extensionId;
+        if (identifierSeparator < 1 ||
+            !Guid.TryParse(segments[1].Substring(identifierSeparator + 1), out extensionId))
+        {
+            return false;
+        }
+
+        try
+        {
+            var root = Path.GetFullPath(extensionsDataRoot).TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            var candidate = Path.GetFullPath(Path.Combine(root, segments[0], segments[1])).TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar);
+            if (!candidate.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            targetDirectory = candidate;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void ProcessExtensionDataRemovalQueue(string dataDir)
+    {
+        var queuePath = Path.Combine(dataDir, "Runtime", ExtensionDataRemovalQueueFileName);
+        if (!File.Exists(queuePath))
+        {
+            return;
+        }
+
+        try
+        {
+            var extensionsDataRoot = Path.Combine(dataDir, "ExtensionsData");
+            var failed = new List<string>();
+            foreach (var queuedPath in File.ReadAllLines(queuePath)
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                string targetDirectory;
+                if (!TryResolveQueuedExtensionDataDirectory(
+                        extensionsDataRoot,
+                        queuedPath,
+                        out targetDirectory))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var categoryDirectory = Path.GetDirectoryName(targetDirectory);
+                    if (string.IsNullOrEmpty(categoryDirectory) ||
+                        !Directory.Exists(categoryDirectory) ||
+                        (File.GetAttributes(categoryDirectory) & FileAttributes.ReparsePoint) != 0)
+                    {
+                        failed.Add(queuedPath.Trim());
+                        continue;
+                    }
+
+                    if (Directory.Exists(targetDirectory))
+                    {
+                        var attributes = File.GetAttributes(targetDirectory);
+                        if ((attributes & FileAttributes.ReparsePoint) != 0)
+                        {
+                            failed.Add(queuedPath.Trim());
+                            continue;
+                        }
+
+                        Directory.Delete(targetDirectory, true);
+                    }
+                }
+                catch
+                {
+                    failed.Add(queuedPath.Trim());
+                }
+            }
+
+            if (failed.Count == 0)
+            {
+                File.Delete(queuePath);
+            }
+            else
+            {
+                File.WriteAllLines(queuePath, failed.ToArray());
+            }
+        }
+        catch
+        {
+            // Extension maintenance must never prevent Osiris from launching.
+        }
+    }
+
+    private static void ProcessExtensionInstallQueue(string dataDir)
+    {
+        var runtimeRoot = Path.Combine(dataDir, "Runtime");
+        var queueRoot = Path.Combine(runtimeRoot, ExtensionInstallQueueDirectoryName);
+        if (!Directory.Exists(queueRoot))
+        {
+            return;
+        }
+
+        try
+        {
+            if ((File.GetAttributes(runtimeRoot) & FileAttributes.ReparsePoint) != 0 ||
+                (File.GetAttributes(queueRoot) & FileAttributes.ReparsePoint) != 0)
+            {
+                LogExtensionInstall(dataDir, "Refused an extension install queue beneath a reparse point.");
+                return;
+            }
+
+            foreach (var jobDirectory in Directory.GetDirectories(queueRoot))
+            {
+                var jobName = Path.GetFileName(jobDirectory);
+                Guid jobId;
+                if (!Guid.TryParseExact(jobName, "N", out jobId))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    InstallQueuedExtension(dataDir, jobDirectory, jobId);
+                    Directory.Delete(jobDirectory, true);
+                }
+                catch (Exception exception)
+                {
+                    LogExtensionInstall(
+                        dataDir,
+                        "Failed queued extension job " + jobName + ": " + exception);
+                    PreserveFailedExtensionJob(queueRoot, jobDirectory, jobName, exception);
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            LogExtensionInstall(dataDir, "Extension install queue processing failed: " + exception);
+        }
+    }
+
+    private static void InstallQueuedExtension(string dataDir, string jobDirectory, Guid jobId)
+    {
+        if ((File.GetAttributes(jobDirectory) & FileAttributes.ReparsePoint) != 0)
+        {
+            throw new InvalidDataException("The extension install job is a reparse point.");
+        }
+
+        var metadataPath = Path.Combine(jobDirectory, "install.ini");
+        var packagePath = Path.Combine(jobDirectory, "package.pext");
+        var metadata = ReadInstallMetadata(metadataPath);
+        string schemaVersion;
+        string extensionId;
+        string version;
+        string relativeFolder;
+        string expectedHash;
+        string expectedSizeText;
+        if (!metadata.TryGetValue("schemaVersion", out schemaVersion) || schemaVersion != "1" ||
+            !metadata.TryGetValue("id", out extensionId) ||
+            !metadata.TryGetValue("version", out version) ||
+            !metadata.TryGetValue("relativeFolder", out relativeFolder) ||
+            !metadata.TryGetValue("sha256", out expectedHash) ||
+            !metadata.TryGetValue("size", out expectedSizeText))
+        {
+            throw new InvalidDataException("The extension install metadata is incomplete.");
+        }
+
+        string category;
+        string folderName;
+        if (!TryValidateExtensionIdentity(relativeFolder, extensionId, out category, out folderName))
+        {
+            throw new InvalidDataException("The extension install identity or target folder is invalid.");
+        }
+
+        Version parsedVersion;
+        if (!Version.TryParse(version, out parsedVersion))
+        {
+            throw new InvalidDataException("The extension install version is invalid.");
+        }
+
+        long expectedSize;
+        if (!long.TryParse(expectedSizeText, out expectedSize) ||
+            expectedSize <= 0 || expectedSize > MaximumExtensionPackageBytes ||
+            !Regex.IsMatch(expectedHash ?? string.Empty, "^[0-9a-fA-F]{64}$") ||
+            !File.Exists(packagePath))
+        {
+            throw new InvalidDataException("The extension package size or checksum is invalid.");
+        }
+
+        var packageInfo = new FileInfo(packagePath);
+        if (packageInfo.Length != expectedSize)
+        {
+            throw new InvalidDataException("The queued extension package size changed.");
+        }
+
+        var actualHash = ComputeSha256(packagePath);
+        if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("The queued extension package checksum changed.");
+        }
+
+        var stagingRoot = Path.Combine(
+            dataDir,
+            "Runtime",
+            "osiris-extension-install-staging");
+        Directory.CreateDirectory(stagingRoot);
+        EnsurePlainDirectory(stagingRoot);
+        var stageDirectory = ResolveChildPath(stagingRoot, jobId.ToString("N"));
+        if (Directory.Exists(stageDirectory))
+        {
+            EnsurePlainDirectory(stageDirectory);
+            Directory.Delete(stageDirectory, true);
+        }
+        Directory.CreateDirectory(stageDirectory);
+
+        try
+        {
+            ExtractAndValidateExtensionPackage(
+                packagePath,
+                stageDirectory,
+                extensionId,
+                version,
+                category);
+
+            var extensionsRoot = Path.Combine(dataDir, "Extensions");
+            Directory.CreateDirectory(extensionsRoot);
+            EnsurePlainDirectory(extensionsRoot);
+            var categoryRoot = ResolveChildPath(extensionsRoot, category);
+            Directory.CreateDirectory(categoryRoot);
+            EnsurePlainDirectory(categoryRoot);
+            var targetDirectory = ResolveChildPath(categoryRoot, folderName);
+            var backupDirectory = default(string);
+
+            if (Directory.Exists(targetDirectory))
+            {
+                EnsurePlainDirectory(targetDirectory);
+                var installedVersion = ReadManifestValue(
+                    Path.Combine(targetDirectory, "extension.yaml"),
+                    "Version") ?? "unknown";
+                Version parsedInstalledVersion;
+                if (Version.TryParse(installedVersion, out parsedInstalledVersion) &&
+                    parsedInstalledVersion >= parsedVersion)
+                {
+                    LogExtensionInstall(
+                        dataDir,
+                        "Skipped " + extensionId + " " + version +
+                        "; installed version " + installedVersion + " is current or newer.");
+                    return;
+                }
+                var backupRoot = Path.Combine(
+                    dataDir,
+                    "Recovery",
+                    "ExtensionUpdates",
+                    folderName);
+                var recoveryRoot = Path.Combine(dataDir, "Recovery");
+                var updateRecoveryRoot = Path.Combine(recoveryRoot, "ExtensionUpdates");
+                Directory.CreateDirectory(recoveryRoot);
+                EnsurePlainDirectory(recoveryRoot);
+                Directory.CreateDirectory(updateRecoveryRoot);
+                EnsurePlainDirectory(updateRecoveryRoot);
+                Directory.CreateDirectory(backupRoot);
+                EnsurePlainDirectory(backupRoot);
+                var backupName = DateTime.UtcNow.ToString("yyyyMMddHHmmssfff") +
+                    "-" + SanitizePathSegment(installedVersion);
+                backupDirectory = ResolveChildPath(backupRoot, backupName);
+                Directory.Move(targetDirectory, backupDirectory);
+            }
+
+            try
+            {
+                Directory.Move(stageDirectory, targetDirectory);
+                ValidateInstalledExtension(targetDirectory, extensionId, version, category);
+            }
+            catch
+            {
+                if (Directory.Exists(targetDirectory))
+                {
+                    EnsurePlainDirectory(targetDirectory);
+                    Directory.Delete(targetDirectory, true);
+                }
+                if (!string.IsNullOrEmpty(backupDirectory) && Directory.Exists(backupDirectory))
+                {
+                    Directory.Move(backupDirectory, targetDirectory);
+                }
+                throw;
+            }
+
+            LogExtensionInstall(
+                dataDir,
+                "Installed " + extensionId + " " + version +
+                (string.IsNullOrEmpty(backupDirectory) ? "." : "; previous version preserved at " + backupDirectory + "."));
+        }
+        finally
+        {
+            if (Directory.Exists(stageDirectory))
+            {
+                EnsurePlainDirectory(stageDirectory);
+                Directory.Delete(stageDirectory, true);
+            }
+        }
+    }
+
+    private static Dictionary<string, string> ReadInstallMetadata(string path)
+    {
+        if (!File.Exists(path) || new FileInfo(path).Length > 16 * 1024)
+        {
+            throw new InvalidDataException("The extension install metadata is missing or too large.");
+        }
+
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var line in File.ReadAllLines(path))
+        {
+            var separator = line.IndexOf('=');
+            if (separator <= 0)
+            {
+                continue;
+            }
+            var key = line.Substring(0, separator).Trim();
+            var value = line.Substring(separator + 1).Trim();
+            if (!values.ContainsKey(key))
+            {
+                values.Add(key, value);
+            }
+        }
+        return values;
+    }
+
+    private static bool TryValidateExtensionIdentity(
+        string relativeFolder,
+        string extensionId,
+        out string category,
+        out string folderName)
+    {
+        category = null;
+        folderName = null;
+        if (string.IsNullOrWhiteSpace(relativeFolder) ||
+            string.IsNullOrWhiteSpace(extensionId) ||
+            Path.IsPathRooted(relativeFolder))
+        {
+            return false;
+        }
+
+        var segments = relativeFolder.Split(new[]
+        {
+            Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar
+        }, StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length != 2 || !IsExtensionCategory(segments[0]) ||
+            segments.Any(segment => segment == "." || segment == "..") ||
+            !string.Equals(segments[1], extensionId, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var separator = extensionId.LastIndexOf('_');
+        Guid id;
+        if (separator < 1 || !Guid.TryParse(extensionId.Substring(separator + 1), out id))
+        {
+            return false;
+        }
+
+        category = segments[0];
+        folderName = segments[1];
+        return true;
+    }
+
+    private static void ExtractAndValidateExtensionPackage(
+        string packagePath,
+        string stageDirectory,
+        string expectedId,
+        string expectedVersion,
+        string category)
+    {
+        var stageRoot = Path.GetFullPath(stageDirectory).TrimEnd(
+            Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        long totalLength = 0;
+        var fileCount = 0;
+        var destinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        using (var archive = ZipFile.OpenRead(packagePath))
+        {
+            foreach (var entry in archive.Entries)
+            {
+                var relative = (entry.FullName ?? string.Empty).Replace('/', Path.DirectorySeparatorChar);
+                if (string.IsNullOrWhiteSpace(relative) || Path.IsPathRooted(relative) ||
+                    relative.IndexOf(':') >= 0)
+                {
+                    throw new InvalidDataException("The extension package contains an invalid path.");
+                }
+
+                var segments = relative.Split(new[] { Path.DirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+                if (segments.Any(segment => segment == "." || segment == "..") ||
+                    segments.Any(segment => string.Equals(segment, "Data", StringComparison.OrdinalIgnoreCase) ||
+                                            string.Equals(segment, "ExtensionsData", StringComparison.OrdinalIgnoreCase)))
+                {
+                    throw new InvalidDataException("The extension package attempts to escape its installation folder.");
+                }
+
+                var destination = Path.GetFullPath(Path.Combine(stageRoot, relative));
+                if (!destination.StartsWith(stageRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException("The extension package contains a path traversal.");
+                }
+
+                if (string.IsNullOrEmpty(entry.Name))
+                {
+                    Directory.CreateDirectory(destination);
+                    continue;
+                }
+
+                fileCount++;
+                totalLength += entry.Length;
+                if (fileCount > MaximumExtensionPackageFiles ||
+                    entry.Length > MaximumExtensionPackageBytes ||
+                    totalLength > MaximumExtensionPackageBytes ||
+                    !destinations.Add(destination))
+                {
+                    throw new InvalidDataException("The extension package exceeds its safe extraction limits.");
+                }
+
+                var extension = Path.GetExtension(destination);
+                if (string.Equals(extension, ".pdb", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(extension, ".log", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(extension, ".user", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(extension, ".suo", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException("The extension package contains development or private files.");
+                }
+
+                Directory.CreateDirectory(Path.GetDirectoryName(destination));
+                using (var input = entry.Open())
+                using (var output = File.Open(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                {
+                    input.CopyTo(output);
+                }
+            }
+        }
+
+        ValidateInstalledExtension(stageDirectory, expectedId, expectedVersion, category);
+    }
+
+    private static void ValidateInstalledExtension(
+        string directory,
+        string expectedId,
+        string expectedVersion,
+        string category)
+    {
+        var manifestPath = Path.Combine(directory, "extension.yaml");
+        var id = ReadManifestValue(manifestPath, "Id");
+        var version = ReadManifestValue(manifestPath, "Version");
+        var module = ReadManifestValue(manifestPath, "Module");
+        var type = ReadManifestValue(manifestPath, "Type");
+        if (!string.Equals(id, expectedId, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(version, expectedVersion, StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(module) ||
+            string.IsNullOrWhiteSpace(type))
+        {
+            throw new InvalidDataException("The extension manifest does not match the catalog.");
+        }
+
+        if ((string.Equals(type, "GameLibrary", StringComparison.OrdinalIgnoreCase) && category != "Libraries") ||
+            (string.Equals(type, "MetadataProvider", StringComparison.OrdinalIgnoreCase) && category != "Metadata") ||
+            (string.Equals(type, "GenericPlugin", StringComparison.OrdinalIgnoreCase) &&
+             category != "Enhancements" && category != "Utilities") ||
+            (!string.Equals(type, "GameLibrary", StringComparison.OrdinalIgnoreCase) &&
+             !string.Equals(type, "MetadataProvider", StringComparison.OrdinalIgnoreCase) &&
+             !string.Equals(type, "GenericPlugin", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidDataException("The extension type does not match its catalog category.");
+        }
+
+        string modulePath;
+        if (!TryResolveFileWithinDirectory(directory, module, out modulePath) ||
+            !File.Exists(modulePath) ||
+            !string.Equals(Path.GetExtension(modulePath), ".dll", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("The extension module is missing or invalid.");
+        }
+
+        var icon = ReadManifestValue(manifestPath, "Icon");
+        string iconPath;
+        if (!string.IsNullOrWhiteSpace(icon) &&
+            (!TryResolveFileWithinDirectory(directory, icon, out iconPath) || !File.Exists(iconPath)))
+        {
+            throw new InvalidDataException("The extension icon is missing or invalid.");
+        }
+    }
+
+    private static bool TryResolveFileWithinDirectory(string directory, string relativePath, out string resolved)
+    {
+        resolved = null;
+        if (string.IsNullOrWhiteSpace(relativePath) || Path.IsPathRooted(relativePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            var root = Path.GetFullPath(directory).TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            var candidate = Path.GetFullPath(Path.Combine(root, relativePath));
+            if (!candidate.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+            resolved = candidate;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string ReadManifestValue(string path, string key)
+    {
+        if (!File.Exists(path) || new FileInfo(path).Length > 128 * 1024)
+        {
+            return null;
+        }
+        var prefix = key + ":";
+        var line = File.ReadLines(path).FirstOrDefault(value =>
+            value.TrimStart().StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+        return line == null ? null : line.Substring(line.IndexOf(':') + 1).Trim().Trim('"', '\'');
+    }
+
+    private static string ResolveChildPath(string rootDirectory, string childName)
+    {
+        var root = Path.GetFullPath(rootDirectory).TrimEnd(
+            Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var child = Path.GetFullPath(Path.Combine(root, childName)).TrimEnd(
+            Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar);
+        if (!child.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("A managed extension path escaped its root.");
+        }
+        return child;
+    }
+
+    private static void EnsurePlainDirectory(string path)
+    {
+        if (!Directory.Exists(path) || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+        {
+            throw new InvalidOperationException("A managed extension directory is missing or unsafe.");
+        }
+    }
+
+    private static string ComputeSha256(string path)
+    {
+        using (var algorithm = SHA256.Create())
+        using (var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            return BitConverter.ToString(algorithm.ComputeHash(stream))
+                .Replace("-", string.Empty)
+                .ToLowerInvariant();
+        }
+    }
+
+    private static string SanitizePathSegment(string value)
+    {
+        var sanitized = new string((value ?? "unknown")
+            .Select(character => Path.GetInvalidFileNameChars().Contains(character) ? '_' : character)
+            .ToArray());
+        return string.IsNullOrWhiteSpace(sanitized) ? "unknown" : sanitized;
+    }
+
+    private static void PreserveFailedExtensionJob(
+        string queueRoot,
+        string jobDirectory,
+        string jobName,
+        Exception exception)
+    {
+        try
+        {
+            File.WriteAllText(
+                Path.Combine(jobDirectory, "error.txt"),
+                DateTime.Now.ToString("O") + Environment.NewLine + exception.Message,
+                new UTF8Encoding(false));
+            var failedPath = ResolveChildPath(queueRoot, ".failed-" + jobName);
+            if (!Directory.Exists(failedPath))
+            {
+                Directory.Move(jobDirectory, failedPath);
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private static void LogExtensionInstall(string dataDir, string message)
+    {
+        try
+        {
+            var logPath = Path.Combine(dataDir, "logs", "extension-installer.log");
+            Directory.CreateDirectory(Path.GetDirectoryName(logPath));
+            File.AppendAllText(
+                logPath,
+                DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + " " + message + Environment.NewLine);
+        }
+        catch
+        {
+        }
+    }
+
     private static void RepairRelocatedLibraryPath(string dataDir)
     {
         var configPath = Path.Combine(dataDir, "Settings", "Core", "config.json");
@@ -393,6 +1101,48 @@ internal static class OsirisLauncher
             Path.Combine(databaseDirectory, "database.json"));
     }
 
+    private static void NormalizeAnimatedArtwork(string appDir, string dataDir)
+    {
+        var normalizer = Path.Combine(appDir, "Osiris.ArtworkNormalizer.exe");
+        if (!File.Exists(normalizer))
+        {
+            return;
+        }
+
+        try
+        {
+            using (var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = normalizer,
+                WorkingDirectory = appDir,
+                Arguments = Quote(dataDir),
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            }))
+            {
+                if (process == null)
+                {
+                    return;
+                }
+
+                // Normalization normally only scans headers. Animated files are
+                // handled in isolated workers so a hostile or unusually large
+                // image cannot exhaust the launcher's address space.
+                if (!process.WaitForExit(120000))
+                {
+                    try { process.Kill(); }
+                    catch { }
+                }
+            }
+        }
+        catch
+        {
+            // Media repair must never prevent Osiris from launching. The helper
+            // records per-file failures in Data/logs/artwork-normalizer.log.
+        }
+    }
+
     private static bool RunUpdateCheck(string root, string[] args)
     {
         if (args != null && args.Any(argument =>
@@ -443,11 +1193,19 @@ internal static class OsirisLauncher
         var dataDir = Path.Combine(root, "Data");
         var exe = Path.Combine(appDir, "Osiris.DesktopApp.exe");
 
+        if (!WaitForRequestedProcess(args))
+        {
+            return 1;
+        }
+
         Directory.CreateDirectory(dataDir);
         PrepareDataLayout(dataDir);
+        ProcessExtensionDataRemovalQueue(dataDir);
+        ProcessExtensionInstallQueue(dataDir);
         OrganizeLibraryDatabaseFiles(dataDir);
         RepairRelocatedLibraryPath(dataDir);
         RepairLegacyBackupArchivePath(dataDir);
+        NormalizeAnimatedArtwork(appDir, dataDir);
         if (RunUpdateCheck(root, args))
         {
             return 0;

@@ -5,7 +5,7 @@ program-update system.
 
 At launch, `Osiris.exe` runs `App/Osiris.Updater.exe`. The updater reads the
 installed `version.json`, queries the configured public GitHub Releases API,
-and compares conventional Osiris versions such as `Beta_1.0.31`. Beta installations
+and compares conventional Osiris versions such as `Beta_1.0.32`. Beta installations
 receive beta or stable releases, while stable installations receive only stable
 releases.
 

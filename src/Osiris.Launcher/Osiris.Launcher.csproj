@@ -7,4 +7,8 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <ApplicationIcon>..\..\assets\Osiris.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
 </Project>

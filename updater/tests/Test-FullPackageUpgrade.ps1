@@ -14,7 +14,7 @@ $ReleaseOutput = [IO.Path]::GetFullPath($ReleaseOutput)
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $workspaceRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..\..'))
 $upgradeRoot = [IO.Path]::GetFullPath((Join-Path $workspaceRoot 'Programming\Sandbox\UpgradeTest'))
-$testRoot = [IO.Path]::GetFullPath((Join-Path $upgradeRoot 'GitHubUpdater-Beta_1.0.31'))
+$testRoot = [IO.Path]::GetFullPath((Join-Path $upgradeRoot 'GitHubUpdater-Beta_1.0.32'))
 if (-not $testRoot.StartsWith($upgradeRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
     throw 'Unsafe upgrade-test path.'
 }
@@ -23,18 +23,12 @@ if (Test-Path -LiteralPath $testRoot) {
 }
 New-Item -ItemType Directory -Path $testRoot | Out-Null
 
-$baseVersion = 'Beta_2026.0.31'
-$installedOldVersion = 'Beta_2026.0.31'
-$targetVersion = 'Beta_1.0.31'
+$baseVersion = 'Beta_1.0.31'
+$installedOldVersion = 'Beta_1.0.31'
+$targetVersion = 'Beta_1.0.32'
 $baseArchive = Join-Path $ReleaseOutput "Osiris-$baseVersion-win-x64.zip"
 $installRoot = Join-Path $testRoot 'installation'
 [IO.Compression.ZipFile]::ExtractToDirectory($baseArchive, $installRoot)
-
-# The immutable legacy package shipped the old calendar-version comparator.
-# Copying the freshly built updater models the one-time manual bootstrap that
-# makes the conventional version line and every future automatic update work.
-$currentUpdater = Join-Path $repositoryRoot 'updater\bin\Release\net462\Osiris.Updater.exe'
-Copy-Item -LiteralPath $currentUpdater -Destination (Join-Path $installRoot 'App\Osiris.Updater.exe') -Force
 
 $installedVersionFile = Join-Path $installRoot 'version.json'
 $installedVersionData = Get-Content -LiteralPath $installedVersionFile -Raw | ConvertFrom-Json

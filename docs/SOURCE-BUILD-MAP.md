@@ -17,9 +17,11 @@ to that installation; paths in this document are relative to
 | `Launchers/OsirisHardBoundLauncher.cs` | `OsirisHardBoundLauncher.exe` | `App/Osiris.DesktopApp.exe` and `App/Osiris.FullscreenApp.exe` | Active. Both deployed launchers matched the development executable by SHA-256. They force each installation to use its root `Data` directory. |
 | `OsirisLauncher.cs` | root launcher | `Osiris.exe` | Migrated to `src/Osiris.Launcher` in the authoritative repository. The release builder now compiles it and embeds the repository-owned Osiris icon. |
 | `Tools/OsirisPortableUninstaller.cs` | portable uninstaller | `Uninstall Osiris.exe` | Active source, but compilation and resource-patching steps are not orchestrated. |
-| `Tools/OsirisArtworkNormalizer.csproj` | `Osiris.ArtworkNormalizer.exe` | `App/Osiris.ArtworkNormalizer.exe` | Active; build output matched the deployed tool by SHA-256. |
+| `Tools/OsirisArtworkNormalizer.csproj` | `Osiris.ArtworkNormalizer.exe` | `App/Osiris.ArtworkNormalizer.exe` | Active. The root launcher runs it before the desktop engine, and the theme invokes its single-file mode immediately after Game Edit saves animated WebP artwork. Animated originals are preserved at the matching relative path under `Data/library/AnimatedArtworkOriginals`; the canonical `Data/library/files` entry is replaced by a compact static first-frame WebP so WPF and ImageMagick never expand the full animation. Build output matched the deployed tool by SHA-256. |
 | Core and SDK patchers under `Tools/` | patched `Playnite.dll`, `Playnite.SDK.dll`, launcher, and selected extension assemblies | corresponding files under `App/` and `Data/Extensions/` | Active transformations, but their input versions and execution order are not captured in one build script. |
 | `GitHub/Extensions/extensions/GameGallery/source` | standalone Game Gallery extension | `Data/Extensions/Enhancements/GameGallery_...` | Migrated to the private `numinainitiative/Osiris_Extensions` repository as version 2.0.1. It builds into an independently versioned `.pext` package; extension-private caches live under the matching `ExtensionsData/Enhancements` folder. Version 2.0.1 restores the theme presentation contract used for the large media stage and right-side thumbnail/trailer rail. The legacy nested repository remains preserved as upstream history/reference. |
+| `GitHub/Extensions/extensions/UniversalSteamMetadata/source` | standalone Steam Metadata provider | `Data/Extensions/Metadata/UniversalSteamMetadata_f2db8fb1-4981-4dc4-b087-05c782215b72` | Migrated to the public extensions repository from the installed 1.0 assembly with matching PDB. The original ID and internal names remain for compatibility; the user-facing provider name is Steam Metadata. `build.ps1` resolves Development SDK, AngleSharp, and SteamKit2 inputs and produces the extension DLL/PDB. MIT provenance and license records are stored beside the source. |
+| `GitHub/Extensions/extensions/SteamGridDBMetadataOsiris/source` | original SteamGridDB Metadata provider | `Data/Extensions/Metadata/SteamGridDBMetadata_8d89f55b-826c-43dc-8946-4038a6e182a2` | Clean-room, MIT-licensed implementation for Osiris using the public SteamGridDB API v2 and a user-supplied key. The extension is the sole owner of SteamGridDB requests and settings; manual and automatic Osiris media paths use its bounded runtime contract. The recovered unlicensed provider under `extensions/SteamGridDBMetadata` remains unpublished local reference and is never a package or release input. |
 | Loose XAML files at `Development/Development (AI)` | directly copied theme/control overrides | `App/Themes/Desktop/Default/...` and other theme paths | Partially traceable. `ComboBox.xaml`, `ListBox.xaml`, `ListView.xaml`, `Menu.xaml`, and `ScrollViewer.xaml` matched deployed files; other loose copies are stale or ambiguous. The release builder synchronizes the bottom-right footer label in `MainWindow.xaml` with `version.json`. |
 | `Build-Release.ps1` | legacy sanitized directory copy | development-only `Release/` output | Superseded by the authoritative `build/New-OsirisRelease.ps1`. |
 
@@ -55,6 +57,40 @@ The grid-style and grid-size controls remain visible. Their selections are
 stored independently in `Data/Settings/Osiris/libraryState.ini`; `Data` is never
 used as a release build source, and no files from it are included in the public
 release payload.
+
+## Restart-safe extension management
+
+The installed-extension Danger Zone uses Playnite's native disabled-plugin list
+and uninstall queue, so disable and uninstall changes take effect before the
+extension assembly is loaded on the next start. Disabling does not remove games
+or metadata already stored in the Osiris library.
+
+Extension-private data removal uses the Osiris-owned queue at
+`Data/Runtime/osiris-extension-data-removals.txt`. The root launcher processes
+that queue after preparing the portable Data layout and before starting the
+desktop engine. Each entry must be a two-segment relative path beneath
+`Data/ExtensionsData`, use one of the canonical extension categories, and end
+in a valid extension GUID. Absolute paths, traversal, unknown categories, and
+reparse-point targets are rejected. Completed entries are removed; entries that
+fail filesystem deletion remain queued for the next launch.
+
+Extensions Browse uses the schema-1 catalog at
+`numinainitiative/Osiris_Extensions/catalog/extensions.json`. A valid enabled
+catalog replaces the compiled offline cards with its public entries and caches
+both the validated JSON and bounded GitHub-hosted icons beneath
+`Data/Cache/Extensions`. Install and Update download immutable GitHub Release
+assets, enforce HTTPS host, declared size, 256 MB maximum, and SHA-256 checks,
+then atomically queue the package beneath
+`Data/Runtime/osiris-extension-install-queue`.
+
+On restart, the root launcher rejects reparse points, traversal, private Data,
+oversized archives, excess file counts, duplicate destinations, and manifest
+identity/type/module mismatches before touching the live extension directory.
+New installs are moved into the canonical category/ID folder. Updates first
+preserve the previous version beneath `Data/Recovery/ExtensionUpdates` and
+restore it if activation fails. `ExtensionsData` is never replaced or removed.
+Rejected jobs are quarantined with an error record and do not retry on every
+startup.
 
 ## Inherited Playnite program-update path
 
