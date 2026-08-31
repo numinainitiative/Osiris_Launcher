@@ -25,7 +25,6 @@ See [Installation](docs/INSTALL.md) for checksum verification and setup notes.
 
 - `src/Osiris.Launcher`: launcher wrapper source.
 - `updater`: Osiris updater source.
-- `installer`: installer-related files.
 - `build`: release packaging scripts.
 - `media`: product branding assets.
 - `docs`: installation notes.
@@ -42,4 +41,4 @@ this folder.
 ## Status
 
 Osiris is currently in Beta. Prerelease packages are portable and unsigned while
-the production installer and code signing are being completed.
+code signing is being completed.
