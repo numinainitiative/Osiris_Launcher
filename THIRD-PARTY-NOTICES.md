@@ -1,12 +1,10 @@
 # Third-party notices
 
-Osiris is based on Playnite and includes third-party components. Their copyright
-and license notices must remain available in every distributed Osiris package.
+Osiris source code in this repository is licensed under the MIT License.
 
-The current runtime includes `App/license.txt` and additional component-specific
-license files. The release builder preserves those files. Before the repository
-or its first release becomes public, Numina Initiative will complete a dependency
-and asset license audit and record the applicable notices here.
+Release packages may include third-party runtime components. Their copyright
+and license notices are included with the distributed application files,
+including `App/license.txt` and component-specific license files where
+applicable.
 
-Playnite project: <https://github.com/JosefNemec/Playnite>
-
+This repository does not include bundled third-party extension packages.

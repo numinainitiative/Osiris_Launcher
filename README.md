@@ -42,3 +42,8 @@ this folder.
 
 Osiris is currently in Beta. Prerelease packages are portable and unsigned while
 code signing is being completed.
+
+## License
+
+Osiris is released under the [MIT License](LICENSE). Third-party runtime notices
+are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
