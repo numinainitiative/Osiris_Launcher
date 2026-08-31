@@ -6,7 +6,7 @@
     <AssemblyName>Osiris.Updater</AssemblyName>
     <RootNamespace>Osiris.Updater</RootNamespace>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <ApplicationIcon>..\assets\Osiris.ico</ApplicationIcon>
+    <ApplicationIcon>..\media\branding\osiris.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System.IO.Compression" />
