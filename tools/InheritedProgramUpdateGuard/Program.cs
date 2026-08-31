@@ -10,19 +10,19 @@ if (args.Length == 2 && args[0] == "--verify")
     using var module = ModuleDefMD.Load(assemblyPath);
     if (!IsProgramUpdateCheckDisabled(module))
     {
-        Console.Error.WriteLine($"Playnite program updates are not disabled: {assemblyPath}");
+        Console.Error.WriteLine($"Inherited program updates are not disabled: {assemblyPath}");
         return verificationFailedExitCode;
     }
 
-    Console.WriteLine($"Verified Playnite program updates are disabled: {assemblyPath}");
+    Console.WriteLine($"Verified inherited program updates are disabled: {assemblyPath}");
     return 0;
 }
 
 if (args.Length is < 1 or > 2)
 {
     Console.Error.WriteLine(
-        "Usage: DisablePlayniteProgramUpdates <input Playnite.dll> [output Playnite.dll]\n" +
-        "       DisablePlayniteProgramUpdates --verify <Playnite.dll>");
+        "Usage: InheritedProgramUpdateGuard <input assembly> [output assembly]\n" +
+        "       InheritedProgramUpdateGuard --verify <assembly>");
     return invalidArgumentsExitCode;
 }
 
@@ -74,7 +74,7 @@ using (var outputModule = ModuleDefMD.Load(outputPath))
     }
 }
 
-Console.WriteLine($"Disabled inherited Playnite program updates: {outputPath}");
+Console.WriteLine($"Disabled inherited program updates: {outputPath}");
 return 0;
 
 static bool IsProgramUpdateCheckDisabled(ModuleDef module) =>
@@ -87,7 +87,7 @@ static MethodDef GetUpdateAvailableGetter(ModuleDef module)
         module.Assembly.Version.Minor != 56)
     {
         throw new InvalidOperationException(
-            "Expected the Playnite 10.56 core assembly; refusing to continue.");
+            "Expected the inherited 10.56 core assembly; refusing to continue.");
     }
 
     var updaterType = module.Find("Playnite.Updater", false)

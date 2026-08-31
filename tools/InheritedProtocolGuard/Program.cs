@@ -3,7 +3,7 @@ using dnlib.DotNet.Emit;
 
 if (args.Length < 1)
 {
-    Console.Error.WriteLine("Usage: DisablePlayniteProtocolHooks [--verify] <assembly> [assembly...]");
+    Console.Error.WriteLine("Usage: InheritedProtocolGuard [--verify] <assembly> [assembly...]");
     return 2;
 }
 
@@ -22,7 +22,7 @@ foreach (var argument in args)
 
 if (assemblyPaths.Count == 0)
 {
-    Console.Error.WriteLine("Usage: DisablePlayniteProtocolHooks [--verify] <assembly> [assembly...]");
+    Console.Error.WriteLine("Usage: InheritedProtocolGuard [--verify] <assembly> [assembly...]");
     return 2;
 }
 
@@ -110,7 +110,7 @@ static PatchResult DisableHooks(ModuleDef module, bool verifyOnly)
                     if (verifyOnly)
                     {
                         throw new InvalidOperationException(
-                            $"{method.FullName} still executes Playnite installaddon URI requests.");
+                            $"{method.FullName} still executes inherited install-addon URI requests.");
                     }
 
                     DisableInstallOnlineAddonCall(instructions, index);
@@ -131,7 +131,7 @@ static PatchResult DisableHooks(ModuleDef module, bool verifyOnly)
                     if (verifyOnly)
                     {
                         throw new InvalidOperationException(
-                            $"{method.FullName} still executes Playnite extension or theme file install requests.");
+                            $"{method.FullName} still executes inherited extension or theme file install requests.");
                     }
 
                     DisableInstanceStringCall(instructions, index);
@@ -144,12 +144,12 @@ static PatchResult DisableHooks(ModuleDef module, bool verifyOnly)
 
     if (!verifyOnly && protocolRegistrationCalls == 0)
     {
-        Console.WriteLine("No active Playnite protocol or extension registration calls were found.");
+        Console.WriteLine("No active inherited protocol or extension registration calls were found.");
     }
 
     if (!verifyOnly && addonInstallHandlers == 0)
     {
-        Console.WriteLine("No active Playnite installaddon URI handler calls were found.");
+        Console.WriteLine("No active inherited install-addon URI handler calls were found.");
     }
 
     return new PatchResult(

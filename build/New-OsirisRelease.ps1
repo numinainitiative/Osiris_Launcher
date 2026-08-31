@@ -41,9 +41,9 @@ $sourceRootPath = Get-FullPath $SourceRoot
 $outputRoot = Get-FullPath $OutputDirectory
 $sourceApp = Join-Path $sourceRootPath 'App'
 $versionFile = Join-Path $repositoryRoot 'version.json'
-$programUpdateTool = Join-Path $repositoryRoot 'tools\DisablePlayniteProgramUpdates\DisablePlayniteProgramUpdates.csproj'
-$protocolHookTool = Join-Path $repositoryRoot 'tools\DisablePlayniteProtocolHooks\DisablePlayniteProtocolHooks.csproj'
-$startupSplashTool = Join-Path $repositoryRoot 'tools\DisablePlayniteStartupSplash\DisablePlayniteStartupSplash.csproj'
+$programUpdateTool = Join-Path $repositoryRoot 'tools\InheritedProgramUpdateGuard\InheritedProgramUpdateGuard.csproj'
+$protocolHookTool = Join-Path $repositoryRoot 'tools\InheritedProtocolGuard\InheritedProtocolGuard.csproj'
+$startupSplashTool = Join-Path $repositoryRoot 'tools\InheritedStartupSplashGuard\InheritedStartupSplashGuard.csproj'
 $osirisUpdaterProject = Join-Path $repositoryRoot 'updater\Osiris.Updater.csproj'
 $osirisUpdaterOutput = Join-Path $repositoryRoot 'updater\bin\Release\net462\Osiris.Updater.exe'
 $osirisLauncherProject = Join-Path $repositoryRoot 'src\Osiris.Launcher\Osiris.Launcher.csproj'
@@ -59,21 +59,21 @@ if (-not (Test-Path -LiteralPath $versionFile -PathType Leaf)) {
     throw "Version metadata is missing: $versionFile"
 }
 
-$sourcePlayniteAssembly = Join-Path $sourceApp 'Playnite.dll'
-if (-not (Test-Path -LiteralPath $sourcePlayniteAssembly -PathType Leaf)) {
-    throw "The Playnite core assembly is missing: $sourcePlayniteAssembly"
+$sourceCoreAssembly = Join-Path $sourceApp 'Playnite.dll'
+if (-not (Test-Path -LiteralPath $sourceCoreAssembly -PathType Leaf)) {
+    throw "The inherited core assembly is missing: $sourceCoreAssembly"
 }
 
 if (-not (Test-Path -LiteralPath $programUpdateTool -PathType Leaf)) {
-    throw "The Playnite program-update verification tool is missing: $programUpdateTool"
+    throw "The inherited program-update verification tool is missing: $programUpdateTool"
 }
 
 if (-not (Test-Path -LiteralPath $protocolHookTool -PathType Leaf)) {
-    throw "The Playnite protocol-hook verification tool is missing: $protocolHookTool"
+    throw "The inherited protocol-handler verification tool is missing: $protocolHookTool"
 }
 
 if (-not (Test-Path -LiteralPath $startupSplashTool -PathType Leaf)) {
-    throw "The Playnite startup-splash verification tool is missing: $startupSplashTool"
+    throw "The inherited startup-splash verification tool is missing: $startupSplashTool"
 }
 
 if (-not (Test-Path -LiteralPath $osirisUpdaterProject -PathType Leaf)) {
@@ -98,9 +98,9 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $osirisUpdaterOutput -P
     throw 'Release validation failed; the Osiris updater could not be built.'
 }
 
-& dotnet run --project $programUpdateTool --configuration Release -- --verify $sourcePlayniteAssembly
+& dotnet run --project $programUpdateTool --configuration Release -- --verify $sourceCoreAssembly
 if ($LASTEXITCODE -ne 0) {
-    throw 'Release validation failed; inherited Playnite program updates are not disabled.'
+    throw 'Release validation failed; inherited program updates are not disabled.'
 }
 
 $versionMetadata = Get-Content -LiteralPath $versionFile -Raw | ConvertFrom-Json
@@ -179,7 +179,7 @@ if (-not (Test-Path -LiteralPath $stagedDesktopEngine -PathType Leaf)) {
 & $largeAddressAwareTool -Path $stagedDesktopEngine -VerifyOnly | Out-Null
 & dotnet run --project $startupSplashTool --configuration Release -- --verify $stagedDesktopEngine
 if ($LASTEXITCODE -ne 0) {
-    throw 'Release validation failed; the inherited Playnite startup splash is still enabled.'
+    throw 'Release validation failed; the inherited startup splash is still enabled.'
 }
 
 $stagedFullscreenEngine = Join-Path $destinationApp 'Osiris.FullscreenEngine.exe'
@@ -187,14 +187,14 @@ if (-not (Test-Path -LiteralPath $stagedFullscreenEngine -PathType Leaf)) {
     throw 'Release validation failed; App/Osiris.FullscreenEngine.exe is missing.'
 }
 
-$stagedPlayniteAssembly = Join-Path $destinationApp 'Playnite.dll'
-if (-not (Test-Path -LiteralPath $stagedPlayniteAssembly -PathType Leaf)) {
-    throw 'Release validation failed; App/Playnite.dll is missing.'
+$stagedCoreAssembly = Join-Path $destinationApp 'Playnite.dll'
+if (-not (Test-Path -LiteralPath $stagedCoreAssembly -PathType Leaf)) {
+    throw 'Release validation failed; the inherited core assembly is missing.'
 }
 
-& dotnet run --project $protocolHookTool --configuration Release -- --verify $stagedPlayniteAssembly
+& dotnet run --project $protocolHookTool --configuration Release -- --verify $stagedCoreAssembly
 if ($LASTEXITCODE -ne 0) {
-    throw 'Release validation failed; inherited Playnite protocol and file-association hooks are still enabled.'
+    throw 'Release validation failed; inherited protocol and file-association hooks are still enabled.'
 }
 
 Copy-Item -LiteralPath $osirisUpdaterOutput -Destination (Join-Path $destinationApp 'Osiris.Updater.exe') -Force
@@ -283,7 +283,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $destinationApp 'license.txt') -Path
 $stagedCommonConfig = Get-Content -LiteralPath $commonConfigPath -Raw
 if ($stagedCommonConfig -match 'playnite\.link/update' -or
     $stagedCommonConfig -notmatch 'key="UpdateBranch" value="disabled"') {
-    throw 'Release validation failed; the inherited Playnite update channel is still configured.'
+    throw 'Release validation failed; the inherited update channel is still configured.'
 }
 
 $stagedThemeMainWindow = Get-Content -LiteralPath $themeMainWindowPath -Raw

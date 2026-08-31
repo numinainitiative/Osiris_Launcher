@@ -3,7 +3,7 @@ using dnlib.DotNet.Emit;
 
 if (args.Length < 1)
 {
-    Console.Error.WriteLine("Usage: DisablePlayniteStartupSplash [--verify] <assembly> [assembly...]");
+    Console.Error.WriteLine("Usage: InheritedStartupSplashGuard [--verify] <assembly> [assembly...]");
     return 2;
 }
 
@@ -22,7 +22,7 @@ foreach (var argument in args)
 
 if (assemblyPaths.Count == 0)
 {
-    Console.Error.WriteLine("Usage: DisablePlayniteStartupSplash [--verify] <assembly> [assembly...]");
+    Console.Error.WriteLine("Usage: InheritedStartupSplashGuard [--verify] <assembly> [assembly...]");
     return 2;
 }
 
