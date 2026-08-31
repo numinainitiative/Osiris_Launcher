@@ -68,6 +68,88 @@ internal static class OsirisLauncher
         }
     }
 
+    private static bool IsInheritedPlayniteInstallRequest(string[] args)
+    {
+        for (var index = 0; index < (args == null ? 0 : args.Length); index++)
+        {
+            var argument = args[index];
+            if (string.Equals(argument, "--uridata", StringComparison.OrdinalIgnoreCase))
+            {
+                if (index + 1 < args.Length &&
+                    IsPlayniteAddonUri(args[index + 1]))
+                {
+                    return true;
+                }
+
+                index++;
+                continue;
+            }
+
+            const string uriPrefix = "--uridata=";
+            if (argument.StartsWith(uriPrefix, StringComparison.OrdinalIgnoreCase) &&
+                IsPlayniteAddonUri(argument.Substring(uriPrefix.Length)))
+            {
+                return true;
+            }
+
+            if (string.Equals(argument, "--installext", StringComparison.OrdinalIgnoreCase))
+            {
+                if (index + 1 < args.Length &&
+                    IsPlayniteExtensionFile(args[index + 1]))
+                {
+                    return true;
+                }
+
+                index++;
+                continue;
+            }
+
+            const string installExtensionPrefix = "--installext=";
+            if (argument.StartsWith(installExtensionPrefix, StringComparison.OrdinalIgnoreCase) &&
+                IsPlayniteExtensionFile(argument.Substring(installExtensionPrefix.Length)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsPlayniteAddonUri(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.StartsWith("playnite://playnite/installaddon/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsPlayniteExtensionFile(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var extension = Path.GetExtension(value.Trim('"'));
+        return string.Equals(extension, ".pext", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(extension, ".pthm", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasArgument(string[] args, string argumentName)
+    {
+        for (var index = 0; index < (args == null ? 0 : args.Length); index++)
+        {
+            if (string.Equals(args[index], argumentName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static bool WaitForRequestedProcess(string[] args)
     {
         var processId = 0;
@@ -187,7 +269,7 @@ internal static class OsirisLauncher
         {
             "Libraries",
             "Metadata",
-            "Enhancements",
+            "Extras",
             "Utilities"
         })
         {
@@ -220,10 +302,11 @@ internal static class OsirisLauncher
             "playnite-howlongtobeat-plugin"
         })
         {
-            MoveExtensionDirectory(extensionsDirectory, folderName, "Enhancements");
+            MoveExtensionDirectory(extensionsDirectory, folderName, "Extras");
         }
 
         MoveLegacyGroup(extensionsDirectory, "Metadata Sources", "Metadata");
+        MoveLegacyGroup(extensionsDirectory, "Enhancements", "Extras");
 
         var legacyPlugins = Path.Combine(extensionsDirectory, "Plugins");
         if (Directory.Exists(legacyPlugins))
@@ -234,7 +317,7 @@ internal static class OsirisLauncher
                 var categoryName =
                     folderName.IndexOf("Gallery", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     folderName.IndexOf("HowLongToBeat", StringComparison.OrdinalIgnoreCase) >= 0
-                        ? "Enhancements"
+                        ? "Extras"
                         : "Utilities";
                 MoveExtensionDirectory(
                     extensionsDirectory,
@@ -257,7 +340,7 @@ internal static class OsirisLauncher
         {
             "Libraries",
             "Metadata",
-            "Enhancements",
+            "Extras",
             "Utilities"
         };
 
@@ -348,7 +431,7 @@ internal static class OsirisLauncher
     {
         return string.Equals(value, "Libraries", StringComparison.OrdinalIgnoreCase) ||
                string.Equals(value, "Metadata", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(value, "Enhancements", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(value, "Extras", StringComparison.OrdinalIgnoreCase) ||
                string.Equals(value, "Utilities", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -844,7 +927,7 @@ internal static class OsirisLauncher
         if ((string.Equals(type, "GameLibrary", StringComparison.OrdinalIgnoreCase) && category != "Libraries") ||
             (string.Equals(type, "MetadataProvider", StringComparison.OrdinalIgnoreCase) && category != "Metadata") ||
             (string.Equals(type, "GenericPlugin", StringComparison.OrdinalIgnoreCase) &&
-             category != "Enhancements" && category != "Utilities") ||
+             category != "Extras" && category != "Utilities") ||
             (!string.Equals(type, "GameLibrary", StringComparison.OrdinalIgnoreCase) &&
              !string.Equals(type, "MetadataProvider", StringComparison.OrdinalIgnoreCase) &&
              !string.Equals(type, "GenericPlugin", StringComparison.OrdinalIgnoreCase)))
@@ -1188,6 +1271,11 @@ internal static class OsirisLauncher
     [STAThread]
     private static int Main(string[] args)
     {
+        if (IsInheritedPlayniteInstallRequest(args))
+        {
+            return 0;
+        }
+
         var root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         var appDir = Path.Combine(root, "App");
         var dataDir = Path.Combine(root, "Data");
@@ -1211,6 +1299,11 @@ internal static class OsirisLauncher
             return 0;
         }
         var forwardedArguments = new List<string>(RemoveUserDataArguments(args));
+        if (!HasArgument(args, "--hidesplashscreen"))
+        {
+            forwardedArguments.Add(Quote("--hidesplashscreen"));
+        }
+
         var forwarded = forwardedArguments.Count == 0
             ? string.Empty
             : " " + string.Join(" ", forwardedArguments.ToArray());
