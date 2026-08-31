@@ -8,7 +8,11 @@ param(
 $ErrorActionPreference = 'Stop'
 
 if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
-    $SourceRoot = Join-Path $PSScriptRoot '..\..\..\Programming\Development\Osiris'
+    $SourceRoot = [Environment]::GetEnvironmentVariable('OSIRIS_RELEASE_SOURCE_ROOT')
+}
+
+if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
+    throw 'Pass -SourceRoot with the path to a prepared Osiris installation.'
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
@@ -38,10 +42,13 @@ $outputRoot = Get-FullPath $OutputDirectory
 $sourceApp = Join-Path $sourceRootPath 'App'
 $versionFile = Join-Path $repositoryRoot 'version.json'
 $programUpdateTool = Join-Path $repositoryRoot 'tools\DisablePlayniteProgramUpdates\DisablePlayniteProgramUpdates.csproj'
+$protocolHookTool = Join-Path $repositoryRoot 'tools\DisablePlayniteProtocolHooks\DisablePlayniteProtocolHooks.csproj'
+$startupSplashTool = Join-Path $repositoryRoot 'tools\DisablePlayniteStartupSplash\DisablePlayniteStartupSplash.csproj'
 $osirisUpdaterProject = Join-Path $repositoryRoot 'updater\Osiris.Updater.csproj'
 $osirisUpdaterOutput = Join-Path $repositoryRoot 'updater\bin\Release\net462\Osiris.Updater.exe'
 $osirisLauncherProject = Join-Path $repositoryRoot 'src\Osiris.Launcher\Osiris.Launcher.csproj'
 $osirisLauncherOutput = Join-Path $repositoryRoot 'src\Osiris.Launcher\bin\Release\net462\Osiris.exe'
+$largeAddressAwareTool = Join-Path $repositoryRoot 'build\Set-LargeAddressAware.ps1'
 
 if (-not (Test-Path -LiteralPath (Join-Path $sourceRootPath 'Osiris.exe') -PathType Leaf) -or
     -not (Test-Path -LiteralPath $sourceApp -PathType Container)) {
@@ -61,12 +68,24 @@ if (-not (Test-Path -LiteralPath $programUpdateTool -PathType Leaf)) {
     throw "The Playnite program-update verification tool is missing: $programUpdateTool"
 }
 
+if (-not (Test-Path -LiteralPath $protocolHookTool -PathType Leaf)) {
+    throw "The Playnite protocol-hook verification tool is missing: $protocolHookTool"
+}
+
+if (-not (Test-Path -LiteralPath $startupSplashTool -PathType Leaf)) {
+    throw "The Playnite startup-splash verification tool is missing: $startupSplashTool"
+}
+
 if (-not (Test-Path -LiteralPath $osirisUpdaterProject -PathType Leaf)) {
     throw "The Osiris updater project is missing: $osirisUpdaterProject"
 }
 
 if (-not (Test-Path -LiteralPath $osirisLauncherProject -PathType Leaf)) {
     throw "The Osiris launcher project is missing: $osirisLauncherProject"
+}
+
+if (-not (Test-Path -LiteralPath $largeAddressAwareTool -PathType Leaf)) {
+    throw "The LARGE_ADDRESS_AWARE build tool is missing: $largeAddressAwareTool"
 }
 
 & dotnet build $osirisLauncherProject --configuration Release --verbosity minimal
@@ -125,7 +144,7 @@ $destinationApp = Join-Path $packageRoot 'App'
 
 $excludedAppDirectories = @(
     'Backup', 'Backups', 'browsercache', 'cache', 'config', 'Data',
-    'Extensions', 'ExtensionsData', 'library', 'logs', 'Recovery', 'Runtime',
+    'Extensions', 'ExtensionsData', 'library', 'logs', 'Programming', 'Recovery', 'Runtime',
     'Settings', 'User Data'
 )
 $excludedAppFiles = @(
@@ -150,6 +169,32 @@ $robocopyArguments = @(
 $robocopyExitCode = $LASTEXITCODE
 if ($robocopyExitCode -gt 7) {
     throw "Robocopy failed with exit code $robocopyExitCode."
+}
+
+$stagedDesktopEngine = Join-Path $destinationApp 'Osiris.DesktopEngine.exe'
+if (-not (Test-Path -LiteralPath $stagedDesktopEngine -PathType Leaf)) {
+    throw 'Release validation failed; App/Osiris.DesktopEngine.exe is missing.'
+}
+& $largeAddressAwareTool -Path $stagedDesktopEngine | Out-Null
+& $largeAddressAwareTool -Path $stagedDesktopEngine -VerifyOnly | Out-Null
+& dotnet run --project $startupSplashTool --configuration Release -- --verify $stagedDesktopEngine
+if ($LASTEXITCODE -ne 0) {
+    throw 'Release validation failed; the inherited Playnite startup splash is still enabled.'
+}
+
+$stagedFullscreenEngine = Join-Path $destinationApp 'Osiris.FullscreenEngine.exe'
+if (-not (Test-Path -LiteralPath $stagedFullscreenEngine -PathType Leaf)) {
+    throw 'Release validation failed; App/Osiris.FullscreenEngine.exe is missing.'
+}
+
+$stagedPlayniteAssembly = Join-Path $destinationApp 'Playnite.dll'
+if (-not (Test-Path -LiteralPath $stagedPlayniteAssembly -PathType Leaf)) {
+    throw 'Release validation failed; App/Playnite.dll is missing.'
+}
+
+& dotnet run --project $protocolHookTool --configuration Release -- --verify $stagedPlayniteAssembly
+if ($LASTEXITCODE -ne 0) {
+    throw 'Release validation failed; inherited Playnite protocol and file-association hooks are still enabled.'
 }
 
 Copy-Item -LiteralPath $osirisUpdaterOutput -Destination (Join-Path $destinationApp 'Osiris.Updater.exe') -Force
@@ -178,19 +223,28 @@ $themeMainWindowPath = Join-Path $destinationApp 'Themes\Desktop\Default\Views\M
 if (-not (Test-Path -LiteralPath $themeMainWindowPath -PathType Leaf)) {
     throw 'Release validation failed; the Osiris desktop theme MainWindow.xaml is missing.'
 }
-$footerStage = $version.Split('_')[0].ToUpperInvariant()
-$footerNumber = $version.Substring($version.IndexOf('_') + 1)
-$themeMainWindow = Get-Content -LiteralPath $themeMainWindowPath -Raw
-$footerStagePattern = '(?<=<TextBlock Text=")(?:ALPHA|BETA|STABLE)(?=")'
-$footerNumberPattern = '(?<=<TextBlock Text=")\d+\.\d+\.\d+(?=")'
-$footerStageMatches = [regex]::Matches($themeMainWindow, $footerStagePattern)
-$footerNumberMatches = [regex]::Matches($themeMainWindow, $footerNumberPattern)
-if ($footerStageMatches.Count -ne 1 -or $footerNumberMatches.Count -ne 1) {
+$themeMainWindow = [xml]::new()
+$themeMainWindow.PreserveWhitespace = $true
+$themeMainWindow.Load($themeMainWindowPath)
+$namespaces = [Xml.XmlNamespaceManager]::new($themeMainWindow.NameTable)
+$namespaces.AddNamespace('wpf', 'http://schemas.microsoft.com/winfx/2006/xaml/presentation')
+$namespaces.AddNamespace('x', 'http://schemas.microsoft.com/winfx/2006/xaml')
+$footerLabels = @($themeMainWindow.SelectNodes(
+    '//wpf:StackPanel[wpf:Button[@x:Name="PART_OsirisDonateButton"]]/wpf:TextBlock', $namespaces))
+$footerStageNodes = @($footerLabels | Where-Object { $_.GetAttribute('Text') -match '^(Alpha|Beta|Stable)$' })
+$footerNumberNodes = @($footerLabels | Where-Object { $_.GetAttribute('Text') -match '^v?\d+\.\d+\.\d+$' })
+if ($footerStageNodes.Count -ne 1 -or $footerNumberNodes.Count -ne 1) {
     throw "Release validation failed; expected one styled Osiris footer version label."
 }
-$themeMainWindow = [regex]::Replace($themeMainWindow, $footerStagePattern, $footerStage)
-$themeMainWindow = [regex]::Replace($themeMainWindow, $footerNumberPattern, $footerNumber)
-Set-Content -LiteralPath $themeMainWindowPath -Value $themeMainWindow -Encoding utf8
+$footerStage = $version.Split('_')[0]
+if ($footerStageNodes[0].GetAttribute('Text') -cmatch '^[A-Z]+$') {
+    $footerStage = $footerStage.ToUpperInvariant()
+}
+$footerNumber = $version.Substring($version.IndexOf('_') + 1)
+if ($footerNumberNodes[0].GetAttribute('Text').StartsWith('v')) { $footerNumber = 'v' + $footerNumber }
+$footerStageNodes[0].SetAttribute('Text', $footerStage)
+$footerNumberNodes[0].SetAttribute('Text', $footerNumber)
+$themeMainWindow.Save($themeMainWindowPath)
 
 foreach ($fileName in @('Osiris.exe', 'README.txt', 'Uninstall Osiris.exe')) {
     $sourceFile = Join-Path $sourceRootPath $fileName
@@ -214,6 +268,12 @@ foreach ($entry in $excludedAppDirectories + $excludedAppFiles) {
 $stagedDataItems = @(Get-ChildItem -LiteralPath (Join-Path $packageRoot 'Data') -Force)
 if ($stagedDataItems.Count -ne 0) {
     throw 'Release validation failed; the staged Data directory is not empty.'
+}
+
+$nestedState = @(Get-ChildItem -LiteralPath $destinationApp -Directory -Recurse |
+    Where-Object { $_.Name -in @('Data', 'ExtensionsData', 'library', 'logs', 'Recovery', 'browsercache') })
+if ($nestedState.Count -ne 0) {
+    throw "Release validation failed; nested writable state was copied into App: $($nestedState.FullName -join ', ')"
 }
 
 if (-not (Test-Path -LiteralPath (Join-Path $destinationApp 'license.txt') -PathType Leaf)) {
