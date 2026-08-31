@@ -27,8 +27,8 @@ See [Installation](docs/INSTALL.md) for checksum verification and setup notes.
 - `updater`: Osiris updater source.
 - `installer`: installer-related files.
 - `build`: release packaging scripts.
-- `media`: repository-owned branding assets.
-- `docs`: concise project documentation.
+- `media`: product branding assets.
+- `docs`: installation notes.
 
 Large runtime binaries are distributed through GitHub Releases instead of normal
 Git history.
@@ -36,13 +36,8 @@ Git history.
 ## User Data
 
 Each Osiris installation keeps a local `Data` folder for the user's library,
-settings, extension data, cache, logs, and backups. Release packages and source
-commits must not include a populated user `Data` folder.
-
-## Maintainers
-
-- [Release checklist](docs/RELEASE.md)
-- [Branding assets](docs/BRANDING.md)
+settings, extension data, cache, logs, and backups. Updating Osiris preserves
+this folder.
 
 ## Status
 

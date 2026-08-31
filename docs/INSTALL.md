@@ -28,7 +28,7 @@ The result should be `True`.
 
 Osiris creates a writable `Data` folder inside the installation directory. This
 folder contains the user's library, settings, extension data, cache, logs, and
-backups. Updates must preserve it.
+backups. It is preserved when Osiris is updated.
 
 ## Windows SmartScreen
 
