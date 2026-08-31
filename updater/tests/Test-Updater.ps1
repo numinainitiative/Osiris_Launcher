@@ -93,15 +93,26 @@ function New-TestRelease {
 function Invoke-UpdateCheck {
     param([string]$InstallRoot, [string]$ReleaseApi)
 
-    $process = Start-Process -FilePath (Join-Path $InstallRoot 'App\Osiris.Updater.exe') `
-        -ArgumentList @(
-            '--check', '--root', ('"' + $InstallRoot + '"'),
-            '--parent', '0', '--api', ('"' + ([Uri]$ReleaseApi).AbsoluteUri + '"'),
-            '--accept', '--no-restart'
-        ) `
-        -Wait -PassThru
-    if ($process.ExitCode -ne 10) {
-        throw "The update checker returned $($process.ExitCode), expected 10."
+    $waitProcess = Start-Process -FilePath powershell.exe `
+        -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Milliseconds 750') `
+        -WindowStyle Hidden `
+        -PassThru
+    try {
+        $process = Start-Process -FilePath (Join-Path $InstallRoot 'App\Osiris.Updater.exe') `
+            -ArgumentList @(
+                '--check', '--root', ('"' + $InstallRoot + '"'),
+                '--parent', $waitProcess.Id.ToString(), '--api', ('"' + ([Uri]$ReleaseApi).AbsoluteUri + '"'),
+                '--accept', '--no-restart'
+            ) `
+            -Wait -PassThru
+        if ($process.ExitCode -ne 10) {
+            throw "The update checker returned $($process.ExitCode), expected 10."
+        }
+    }
+    finally {
+        if (-not $waitProcess.HasExited) {
+            Stop-Process -Id $waitProcess.Id -Force
+        }
     }
 }
 
@@ -122,7 +133,7 @@ function Wait-ForLogText {
 $installRoot = Join-Path $testRoot 'installation'
 New-TestInstallation -Root $installRoot -Version 'Beta_1.0.31' -Marker 'old'
 $sentinel = Join-Path $installRoot 'Data\preserve-me.txt'
-Set-Content -LiteralPath $sentinel -Value 'personal data must survive'
+Set-Content -LiteralPath $sentinel -Value 'user data must survive'
 $sentinelHash = (Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash
 
 $successApi = New-TestRelease -Version 'Beta_1.0.32' -Marker 'updated'
