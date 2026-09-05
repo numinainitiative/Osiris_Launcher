@@ -151,7 +151,7 @@ $excludedAppFiles = @(
     'backup.json', 'config.json', 'fullscreenConfig.json', 'libraryState.ini',
     'osiris-font-size.json', 'osiris-game-details-settings.json',
     'osiris-grid-view-settings.json', 'osiris-ui-settings.json',
-    'osiris-ui-theme.json', 'windowPositions.json', '*.bak', '*.tmp', '*~'
+    'osiris-ui-theme.json', 'windowPositions.json', '*.bak', '*.tmp', '*.log', '*.pdb', '*~'
 )
 
 $excludedDirectoryPaths = @($excludedAppDirectories | ForEach-Object {
@@ -244,9 +244,24 @@ $footerNumber = $version.Substring($version.IndexOf('_') + 1)
 if ($footerNumberNodes[0].GetAttribute('Text').StartsWith('v')) { $footerNumber = 'v' + $footerNumber }
 $footerStageNodes[0].SetAttribute('Text', $footerStage)
 $footerNumberNodes[0].SetAttribute('Text', $footerNumber)
+
+# Welcome-on-every-startup is a Development-only testing switch.
+# Change the staged theme, never the reusable Development installation/profile.
+$welcomeOverlay = $themeMainWindow.SelectSingleNode(
+    '//wpf:Grid[@x:Name="PART_OsirisWelcomeOverlay"]', $namespaces)
+if ($null -eq $welcomeOverlay) {
+    throw 'Release validation failed; the welcome screen is missing.'
+}
+$welcomeStartupSwitch = $welcomeOverlay.GetAttributeNode(
+    'WelcomeNotificationController.ShowOnEveryStartup',
+    'clr-namespace:OsirisTheme;assembly=OsirisTheme')
+if ($null -eq $welcomeStartupSwitch) {
+    throw 'Release validation failed; the welcome startup policy is missing.'
+}
+$welcomeStartupSwitch.Value = 'False'
 $themeMainWindow.Save($themeMainWindowPath)
 
-foreach ($fileName in @('Osiris.exe', 'README.txt', 'Uninstall Osiris.exe')) {
+foreach ($fileName in @('Osiris.exe', 'Uninstall Osiris.exe')) {
     $sourceFile = Join-Path $sourceRootPath $fileName
     if (Test-Path -LiteralPath $sourceFile -PathType Leaf) {
         Copy-Item -LiteralPath $sourceFile -Destination (Join-Path $packageRoot $fileName)
@@ -256,6 +271,9 @@ foreach ($fileName in @('Osiris.exe', 'README.txt', 'Uninstall Osiris.exe')) {
 Copy-Item -LiteralPath $osirisLauncherOutput -Destination (Join-Path $packageRoot 'Osiris.exe') -Force
 
 Copy-Item -LiteralPath $versionFile -Destination (Join-Path $packageRoot 'version.json')
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'LICENSE') -Destination (Join-Path $packageRoot 'LICENSE')
+# Use the public installation guide, not a Development README with local machine paths.
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'docs\INSTALL.md') -Destination (Join-Path $packageRoot 'README.txt')
 
 New-Item -ItemType Directory -Path (Join-Path $packageRoot 'Data') | Out-Null
 
