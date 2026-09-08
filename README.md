@@ -35,7 +35,12 @@ See [Installation](docs/INSTALL.md) for checksum verification and setup notes.
 
 If you like Osiris, you can provide your support and help keep its development and maintenance going, thanks.
 
-[www.patreon.com/OsirisLauncher](https://www.patreon.com/OsirisLauncher)
+<div align="center">
+  <a href="https://www.patreon.com/OsirisLauncher">
+    <img src="media/readme/patreon.png" alt="Patreon" width="48"><br>
+    <strong>Support Osiris on Patreon</strong>
+  </a>
+</div>
 
 ## Status
 
