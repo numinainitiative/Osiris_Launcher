@@ -1,8 +1,16 @@
-# Osiris Launcher
+<p align="center">
+  <img src="media/readme/osiris-glitch-wordmark.png" alt="Osiris Launcher wordmark" width="600">
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="media/readme/osiris-logo-white.png" alt="Osiris logo" width="150">
+</p>
 
-Osiris Launcher is a Windows game-library launcher developed by Numina
-Initiative. It provides a unified home for PC games, extensions, metadata, and
-library management.
+<h1 align="center">OSIRIS LAUNCHER</h1>
+
+Osiris is a game launcher build on top of Playnite, but redesigned completely to elevate the experience to a more efficient and beautiful level. It allows you to host all your games in one single library and add to them as much information, details and statistics as it exists. Osiris is focused on collectors, it provides the ability to host and manage big game libraries and provide various functionalities to improve the overall gaming experience. Its currently build and maintained by one single developer.
+
+<p align="center">
+  <img src="media/readme/osiris-library.png" alt="Osiris Launcher library">
+</p>
 
 ## Download
 
@@ -21,22 +29,9 @@ runnable Osiris packages.
 
 See [Installation](docs/INSTALL.md) for checksum verification and setup notes.
 
-## Repository Contents
+## Support
 
-- `src/Osiris.Launcher`: launcher wrapper source.
-- `updater`: Osiris updater source.
-- `build`: release packaging scripts.
-- `media`: product branding assets.
-- `docs`: installation notes.
-
-Large runtime binaries are distributed through GitHub Releases instead of normal
-Git history.
-
-## User Data
-
-Each Osiris installation keeps a local `Data` folder for the user's library,
-settings, extension data, cache, logs, and backups. Updating Osiris preserves
-this folder.
+If you like Osiris, you can provide your support and help keep its development and maintenance going, thanks.
 
 ## Status
 
