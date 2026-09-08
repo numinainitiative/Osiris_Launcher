@@ -1,15 +1,17 @@
 <p align="center">
   <img src="media/readme/osiris-glitch-wordmark.png" alt="Osiris Launcher wordmark" width="600">
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="media/readme/osiris-logo-white.png" alt="Osiris logo" width="150">
 </p>
 
 <h1 align="center">OSIRIS LAUNCHER</h1>
 
-Osiris is a game launcher build on top of Playnite, but redesigned completely to elevate the experience to a more efficient and beautiful level. It allows you to host all your games in one single library and add to them as much information, details and statistics as it exists. Osiris is focused on collectors, it provides the ability to host and manage big game libraries and provide various functionalities to improve the overall gaming experience. Its currently build and maintained by one single developer.
+Osiris is a game launcher build on top of [Playnite](https://github.com/JosefNemec/Playnite), but redesigned completely to elevate the experience to a more efficient and beautiful level. It allows you to host all your games in one single library and add to them as much information, details and statistics as it exists. Osiris is focused on collectors, it provides the ability to host and manage big game libraries and provide various functionalities to improve the overall gaming experience. Its currently build and maintained by one single developer.
 
 <p align="center">
-  <img src="media/readme/osiris-library.png" alt="Osiris Launcher library">
+  <img src="media/readme/osiris-library.png" alt="Osiris Launcher library" width="100%">
+</p>
+
+<p align="center">
+  <img src="media/readme/osiris-game-details.png" alt="Osiris Launcher game details page" width="100%">
 </p>
 
 ## Download
@@ -32,6 +34,8 @@ See [Installation](docs/INSTALL.md) for checksum verification and setup notes.
 ## Support
 
 If you like Osiris, you can provide your support and help keep its development and maintenance going, thanks.
+
+[www.patreon.com/OsirisLauncher](https://www.patreon.com/OsirisLauncher)
 
 ## Status
 
