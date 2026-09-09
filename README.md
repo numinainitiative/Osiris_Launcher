@@ -14,32 +14,36 @@ Osiris is a game launcher build on top of [Playnite](https://github.com/JosefNem
   <img src="media/readme/osiris-game-details.png" alt="Osiris Launcher game details page" width="1000">
 </p>
 
-## Download
+## Installation
 
-Download the latest prerelease from the
-[GitHub Releases](https://github.com/numinainitiative/Osiris_Launcher/releases)
-page.
+1. Download the [latest release](https://github.com/numinainitiative/Osiris_Launcher/releases).
+2. Unpack the downloaded ZIP archive.
+3. Run `Osiris.exe`.
 
-Use the ZIP package named:
-
-```text
-Osiris-<version>-win-x64.zip
-```
-
-Do not use GitHub's automatically generated source-code archives; they are not
-runnable Osiris packages.
-
-See [Installation](docs/INSTALL.md) for checksum verification and setup notes.
+See the [installation guide](docs/INSTALL.md) for checksum verification and
+additional setup notes.
 
 ## Support
 
-If you like Osiris, you can provide your support and help keep its development and maintenance going, thanks.
+If you like Osiris, you can support its continued development and maintenance through Patreon or Ko-fi. Thank you!
 
 <div align="center">
-  <a href="https://www.patreon.com/OsirisLauncher">
-    <img src="media/readme/patreon.png" alt="Patreon" width="48"><br>
-    <strong>Support Osiris on Patreon</strong>
-  </a>
+  <table>
+    <tr>
+      <td align="center">
+        <a href="https://www.patreon.com/OsirisLauncher">
+          <img src="media/readme/patreon.png" alt="Patreon" width="48"><br>
+          <strong>Support Osiris on Patreon</strong>
+        </a>
+      </td>
+      <td align="center">
+        <a href="https://ko-fi.com/osirislauncher">
+          <img src="media/readme/kofi.png" alt="Ko-fi" width="48"><br>
+          <strong>Support Osiris on Ko-fi</strong>
+        </a>
+      </td>
+    </tr>
+  </table>
 </div>
 
 ## Status
