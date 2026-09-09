@@ -15,8 +15,8 @@ using System.Threading;
 [assembly: AssemblyDescription("Numina Initiative Osiris launcher")]
 [assembly: AssemblyCompany("Numina Initiative")]
 [assembly: AssemblyProduct("Osiris")]
-[assembly: AssemblyVersion("0.0.35.0")]
-[assembly: AssemblyFileVersion("0.0.35.0")]
+[assembly: AssemblyVersion("0.0.36.0")]
+[assembly: AssemblyFileVersion("0.0.36.0")]
 
 internal static class OsirisLauncher
 {
