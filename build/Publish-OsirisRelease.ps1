@@ -68,7 +68,7 @@ $notes = if (-not [string]::IsNullOrWhiteSpace($ReleaseNotesFile)) {
 else {
     "Osiris $version"
 }
-$isPrerelease = [string]$versionMetadata.channel -ne 'stable'
+$isPrerelease = [string]$versionMetadata.channel -eq 'alpha'
 $payload = [ordered]@{
     tag_name = $tag
     target_commitish = 'main'
@@ -76,6 +76,7 @@ $payload = [ordered]@{
     body = $notes
     draft = -not $Publish
     prerelease = $isPrerelease
+    make_latest = $(if ($isPrerelease) { 'false' } else { 'true' })
     generate_release_notes = $false
 } | ConvertTo-Json
 
