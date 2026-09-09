@@ -15,8 +15,8 @@ using System.Threading;
 [assembly: AssemblyDescription("Numina Initiative Osiris launcher")]
 [assembly: AssemblyCompany("Numina Initiative")]
 [assembly: AssemblyProduct("Osiris")]
-[assembly: AssemblyVersion("0.0.34.0")]
-[assembly: AssemblyFileVersion("0.0.34.0")]
+[assembly: AssemblyVersion("0.0.35.0")]
+[assembly: AssemblyFileVersion("0.0.35.0")]
 
 internal static class OsirisLauncher
 {
@@ -1341,48 +1341,6 @@ internal static class OsirisLauncher
         }
     }
 
-    private static bool RunUpdateCheck(string root, string[] args)
-    {
-        if (args != null && args.Any(argument =>
-            string.Equals(argument, "--skipupdatecheck", StringComparison.OrdinalIgnoreCase)))
-        {
-            return false;
-        }
-
-        var updater = Path.Combine(root, "App", "Osiris.Updater.exe");
-        var version = Path.Combine(root, "version.json");
-        if (!File.Exists(updater) || !File.Exists(version))
-        {
-            return false;
-        }
-
-        try
-        {
-            using (var process = Process.Start(new ProcessStartInfo
-            {
-                FileName = updater,
-                WorkingDirectory = Path.GetDirectoryName(updater),
-                Arguments = "--check --root " + Quote(root) +
-                    " --parent " + Process.GetCurrentProcess().Id,
-                UseShellExecute = false
-            }))
-            {
-                if (process == null)
-                {
-                    return false;
-                }
-
-                process.WaitForExit();
-                return process.ExitCode == 10;
-            }
-        }
-        catch
-        {
-            // Update availability must never prevent Osiris from launching.
-            return false;
-        }
-    }
-
     [STAThread]
     private static int Main(string[] args)
     {
@@ -1409,10 +1367,6 @@ internal static class OsirisLauncher
         RepairRelocatedLibraryPath(dataDir);
         RepairLegacyBackupArchivePath(dataDir);
         NormalizeAnimatedArtwork(appDir, dataDir);
-        if (RunUpdateCheck(root, args))
-        {
-            return 0;
-        }
         var registeredFonts = RegisterBundledFonts(appDir);
         try
         {

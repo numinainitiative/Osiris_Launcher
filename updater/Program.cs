@@ -11,7 +11,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Web.Script.Serialization;
-using System.Windows.Forms;
 
 namespace Osiris.Updater
 {
@@ -24,9 +23,6 @@ namespace Osiris.Updater
         private static int Main(string[] args)
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-
             try
             {
                 var options = Arguments.Parse(args);
@@ -114,26 +110,8 @@ namespace Osiris.Updater
 
             if (!options.Accept)
             {
-                var notes = string.IsNullOrWhiteSpace(latestRelease.body)
-                    ? "A new Osiris release is available."
-                    : latestRelease.body.Trim();
-                if (notes.Length > 1200)
-                {
-                    notes = notes.Substring(0, 1200) + "…";
-                }
-
-                var choice = MessageBox.Show(
-                    "Osiris " + releaseVersion + " is available.\r\n\r\n" + notes +
-                    "\r\n\r\nInstall it now? Your games, settings, and Data will be preserved.",
-                    "Osiris update available",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Information,
-                    MessageBoxDefaultButton.Button1);
-                if (choice != DialogResult.Yes)
-                {
-                    WriteLog(root, "User postponed Osiris " + releaseVersion + ".");
-                    return 0;
-                }
+                WriteLog(root, "Osiris " + releaseVersion + " is available; waiting for in-app acceptance.");
+                return 0;
             }
 
             var workRoot = Path.Combine(root, "Data", "Runtime", "Updates", releaseVersion.ToString());
@@ -174,6 +152,7 @@ namespace Osiris.Updater
         {
             var root = ValidateRoot(options.Root);
             WaitForParent(options.ParentProcessId);
+            WaitForLauncher(root);
             var staging = Path.GetFullPath(options.Staging).TrimEnd(Path.DirectorySeparatorChar);
             EnsureChildPath(Path.Combine(root, "Data", "Runtime", "Updates"), staging);
             ValidateStagedPackage(staging, options.TargetVersion);
@@ -265,6 +244,52 @@ namespace Osiris.Updater
             }
 
             return 0;
+        }
+
+        private static void WaitForLauncher(string root)
+        {
+            var expectedPath = Path.GetFullPath(Path.Combine(root, "Osiris.exe"));
+            var currentProcessId = Process.GetCurrentProcess().Id;
+            var deadline = DateTime.UtcNow.AddSeconds(60);
+            while (DateTime.UtcNow < deadline)
+            {
+                Process matchingProcess = null;
+                foreach (var process in Process.GetProcessesByName("Osiris"))
+                {
+                    try
+                    {
+                        if (process.Id != currentProcessId &&
+                            string.Equals(
+                                Path.GetFullPath(process.MainModule.FileName),
+                                expectedPath,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            matchingProcess = process;
+                            break;
+                        }
+                    }
+                    catch
+                    {
+                    }
+
+                    process.Dispose();
+                }
+
+                if (matchingProcess == null)
+                {
+                    return;
+                }
+
+                using (matchingProcess)
+                {
+                    if (matchingProcess.WaitForExit(1000))
+                    {
+                        return;
+                    }
+                }
+            }
+
+            throw new TimeoutException("The Osiris launcher did not close in time for the update.");
         }
 
         private static ReleaseInfo SelectLatestRelease(

@@ -1,8 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net462</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>Osiris.Updater</AssemblyName>
     <RootNamespace>Osiris.Updater</RootNamespace>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
