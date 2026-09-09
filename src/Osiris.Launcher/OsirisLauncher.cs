@@ -5,23 +5,138 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 [assembly: AssemblyTitle("Osiris")]
 [assembly: AssemblyDescription("Numina Initiative Osiris launcher")]
 [assembly: AssemblyCompany("Numina Initiative")]
 [assembly: AssemblyProduct("Osiris")]
-[assembly: AssemblyVersion("0.0.33.0")]
-[assembly: AssemblyFileVersion("0.0.33.0")]
+[assembly: AssemblyVersion("0.0.34.0")]
+[assembly: AssemblyFileVersion("0.0.34.0")]
 
 internal static class OsirisLauncher
 {
+    private const uint FrNotEnum = 0x20;
     private const string ExtensionDataRemovalQueueFileName = "osiris-extension-data-removals.txt";
     private const string ExtensionInstallQueueDirectoryName = "osiris-extension-install-queue";
     private const long MaximumExtensionPackageBytes = 256L * 1024L * 1024L;
     private const int MaximumExtensionPackageFiles = 2048;
+
+    [DllImport("gdi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern int AddFontResourceEx(string fileName, uint flags, IntPtr reserved);
+
+    [DllImport("gdi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool RemoveFontResourceEx(string fileName, uint flags, IntPtr reserved);
+
+    private static List<string> RegisterBundledFonts(string appDirectory)
+    {
+        var registeredFonts = new List<string>();
+        var fontDirectory = Path.Combine(
+            appDirectory,
+            "Themes",
+            "Desktop",
+            "Default",
+            "Fonts");
+        foreach (var fileName in new[]
+        {
+            "Rajdhani-Light.ttf",
+            "Rajdhani-Regular.ttf",
+            "Rajdhani-Medium.ttf",
+            "Rajdhani-SemiBold.ttf",
+            "Rajdhani-Bold.ttf"
+        })
+        {
+            var fontPath = Path.Combine(fontDirectory, fileName);
+            if (!File.Exists(fontPath))
+            {
+                continue;
+            }
+
+            try
+            {
+                // Register Osiris's own faces for this Windows session without
+                // adding a permanent user font or exposing duplicate entries in
+                // font pickers. The wrapper remains alive for the desktop
+                // process's lifetime and removes each registration on exit.
+                if (AddFontResourceEx(fontPath, FrNotEnum, IntPtr.Zero) > 0)
+                {
+                    registeredFonts.Add(fontPath);
+                }
+            }
+            catch
+            {
+                // A font problem must not prevent the desktop engine from
+                // opening; release packaging separately requires every face.
+            }
+        }
+
+        return registeredFonts;
+    }
+
+    private static void UnregisterBundledFonts(IEnumerable<string> fontPaths)
+    {
+        foreach (var fontPath in fontPaths.Reverse())
+        {
+            try
+            {
+                RemoveFontResourceEx(fontPath, FrNotEnum, IntPtr.Zero);
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private static Process FindDesktopEngine(string appDirectory)
+    {
+        var expectedPath = Path.GetFullPath(Path.Combine(appDirectory, "Osiris.DesktopEngine.exe"));
+        foreach (var process in Process.GetProcessesByName("Osiris.DesktopEngine"))
+        {
+            try
+            {
+                var actualPath = Path.GetFullPath(process.MainModule.FileName);
+                if (string.Equals(actualPath, expectedPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return process;
+                }
+            }
+            catch
+            {
+            }
+
+            process.Dispose();
+        }
+
+        return null;
+    }
+
+    private static void WaitForDesktopEngine(string appDirectory, Process desktopApp)
+    {
+        desktopApp.WaitForExit();
+
+        // DesktopApp is Playnite's short-lived bootstrap process. Keep this
+        // wrapper (and therefore its temporary font registrations) alive for
+        // the real desktop engine that it creates.
+        for (var attempt = 0; attempt < 300; attempt++)
+        {
+            var engine = FindDesktopEngine(appDirectory);
+            if (engine != null)
+            {
+                using (engine)
+                {
+                    engine.WaitForExit();
+                }
+
+                return;
+            }
+
+            Thread.Sleep(100);
+        }
+    }
 
     private static string Quote(string value)
     {
@@ -1298,24 +1413,41 @@ internal static class OsirisLauncher
         {
             return 0;
         }
-        var forwardedArguments = new List<string>(RemoveUserDataArguments(args));
-        if (!HasArgument(args, "--hidesplashscreen"))
+        var registeredFonts = RegisterBundledFonts(appDir);
+        try
         {
-            forwardedArguments.Add(Quote("--hidesplashscreen"));
+            var forwardedArguments = new List<string>(RemoveUserDataArguments(args));
+            if (!HasArgument(args, "--hidesplashscreen"))
+            {
+                forwardedArguments.Add(Quote("--hidesplashscreen"));
+            }
+
+            var forwarded = forwardedArguments.Count == 0
+                ? string.Empty
+                : " " + string.Join(" ", forwardedArguments.ToArray());
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = exe,
+                WorkingDirectory = appDir,
+                Arguments = "--userdatadir " + Quote(dataDir) + forwarded,
+                UseShellExecute = false
+            };
+
+            using (var process = Process.Start(startInfo))
+            {
+                if (process == null)
+                {
+                    return 1;
+                }
+
+                WaitForDesktopEngine(appDir, process);
+            }
+
+            return 0;
         }
-
-        var forwarded = forwardedArguments.Count == 0
-            ? string.Empty
-            : " " + string.Join(" ", forwardedArguments.ToArray());
-        var startInfo = new ProcessStartInfo
+        finally
         {
-            FileName = exe,
-            WorkingDirectory = appDir,
-            Arguments = "--userdatadir " + Quote(dataDir) + forwarded,
-            UseShellExecute = false
-        };
-
-        Process.Start(startInfo);
-        return 0;
+            UnregisterBundledFonts(registeredFonts);
+        }
     }
 }

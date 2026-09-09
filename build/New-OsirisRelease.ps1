@@ -219,6 +219,25 @@ foreach ($setting in @{
 }
 $commonConfig.Save($commonConfigPath)
 
+$desktopThemeRoot = Join-Path $destinationApp 'Themes\Desktop\Default'
+$rajdhaniFontDirectory = Join-Path $desktopThemeRoot 'Fonts'
+$requiredRajdhaniAssets = @(
+    'Rajdhani-Light.ttf',
+    'Rajdhani-Regular.ttf',
+    'Rajdhani-Medium.ttf',
+    'Rajdhani-SemiBold.ttf',
+    'Rajdhani-Bold.ttf',
+    'OFL.txt',
+    'METADATA.pb'
+)
+foreach ($assetName in $requiredRajdhaniAssets) {
+    $assetPath = Join-Path $rajdhaniFontDirectory $assetName
+    if (-not (Test-Path -LiteralPath $assetPath -PathType Leaf) -or
+        (Get-Item -LiteralPath $assetPath).Length -eq 0) {
+        throw "Release validation failed; bundled Rajdhani asset is missing or empty: $assetName"
+    }
+}
+
 $themeMainWindowPath = Join-Path $destinationApp 'Themes\Desktop\Default\Views\MainWindow.xaml'
 if (-not (Test-Path -LiteralPath $themeMainWindowPath -PathType Leaf)) {
     throw 'Release validation failed; the Osiris desktop theme MainWindow.xaml is missing.'

@@ -12,6 +12,7 @@ if ([string]::IsNullOrWhiteSpace($ArtifactDirectory)) {
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $versionMetadata = Get-Content -LiteralPath (Join-Path $repositoryRoot 'version.json') -Raw | ConvertFrom-Json
 $version = [string]$versionMetadata.version
+$displayVersion = $version.Replace('_', ' ')
 $owner = [string]$versionMetadata.repositoryOwner
 $repository = [string]$versionMetadata.repositoryName
 $tag = $version
@@ -71,7 +72,7 @@ $isPrerelease = [string]$versionMetadata.channel -ne 'stable'
 $payload = [ordered]@{
     tag_name = $tag
     target_commitish = 'main'
-    name = "Osiris $version"
+    name = "Osiris $displayVersion"
     body = $notes
     draft = -not $Publish
     prerelease = $isPrerelease
