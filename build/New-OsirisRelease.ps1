@@ -49,6 +49,9 @@ $osirisUpdaterOutput = Join-Path $repositoryRoot 'updater\bin\Release\net462\Osi
 $osirisLauncherProject = Join-Path $repositoryRoot 'src\Osiris.Launcher\Osiris.Launcher.csproj'
 $osirisLauncherOutput = Join-Path $repositoryRoot 'src\Osiris.Launcher\bin\Release\net462\Osiris.exe'
 $largeAddressAwareTool = Join-Path $repositoryRoot 'build\Set-LargeAddressAware.ps1'
+$brandingTool = Join-Path $repositoryRoot 'tools\Branding\Branding.csproj'
+$brandingIcon = Join-Path $repositoryRoot 'media\branding\osiris.ico'
+$acceptedBrandingIconHash = '32264a091d2f781b8ad73453c22bf6c1952a4762b40b84e03cfc401e75c1ece4'
 
 if (-not (Test-Path -LiteralPath (Join-Path $sourceRootPath 'Osiris.exe') -PathType Leaf) -or
     -not (Test-Path -LiteralPath $sourceApp -PathType Container)) {
@@ -88,6 +91,15 @@ if (-not (Test-Path -LiteralPath $largeAddressAwareTool -PathType Leaf)) {
     throw "The LARGE_ADDRESS_AWARE build tool is missing: $largeAddressAwareTool"
 }
 
+if (-not (Test-Path -LiteralPath $brandingTool -PathType Leaf)) {
+    throw "The launcher icon verification tool is missing: $brandingTool"
+}
+
+if (-not (Test-Path -LiteralPath $brandingIcon -PathType Leaf) -or
+    (Get-FileHash -LiteralPath $brandingIcon -Algorithm SHA256).Hash.ToLowerInvariant() -ne $acceptedBrandingIconHash) {
+    throw 'Release validation failed; media/branding/osiris.ico is not the accepted Osiris application icon.'
+}
+
 & dotnet build $osirisLauncherProject --configuration Release --verbosity minimal
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $osirisLauncherOutput -PathType Leaf)) {
     throw 'Release validation failed; the Osiris launcher could not be built.'
@@ -96,6 +108,12 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $osirisLauncherOutput -
 & dotnet build $osirisUpdaterProject --configuration Release --verbosity minimal
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $osirisUpdaterOutput -PathType Leaf)) {
     throw 'Release validation failed; the Osiris updater could not be built.'
+}
+
+& dotnet run --project $brandingTool --configuration Release -- `
+    --verify $brandingIcon $osirisLauncherOutput $osirisUpdaterOutput
+if ($LASTEXITCODE -ne 0) {
+    throw 'Release validation failed; a built Osiris executable does not contain the accepted application icon.'
 }
 
 & dotnet run --project $programUpdateTool --configuration Release -- --verify $sourceCoreAssembly
