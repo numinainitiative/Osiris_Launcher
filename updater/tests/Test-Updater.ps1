@@ -1,16 +1,23 @@
 [CmdletBinding()]
-param()
+param([string]$TestRoot)
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-$testRoot = Join-Path $repositoryRoot 'artifacts\updater-integration-test'
+$sandboxRoot = [IO.Path]::GetFullPath((Join-Path $repositoryRoot '..\..\Programming\Sandbox\UpgradeTest')).TrimEnd('\')
+if ([string]::IsNullOrWhiteSpace($TestRoot)) {
+    $TestRoot = Join-Path $sandboxRoot ('updater-integration-' + [DateTime]::Now.ToString('yyyyMMdd-HHmmss'))
+}
+$testRoot = [IO.Path]::GetFullPath($TestRoot).TrimEnd('\')
+if (-not $testRoot.StartsWith($sandboxRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Updater tests must use a dedicated directory below Programming/Sandbox/UpgradeTest.'
+}
 $launcher = Join-Path $repositoryRoot 'src\Osiris.Launcher\bin\Release\net462\Osiris.exe'
 $updater = Join-Path $repositoryRoot 'updater\bin\Release\net462\Osiris.Updater.exe'
 
 if (Test-Path -LiteralPath $testRoot) {
-    Remove-Item -LiteralPath $testRoot -Recurse -Force
+    throw "Refusing to overwrite an existing test directory: $testRoot"
 }
 New-Item -ItemType Directory -Path $testRoot | Out-Null
 
