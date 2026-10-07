@@ -45,3 +45,9 @@ and old Stats installation; forced apply failure restored the previous payload
 without changing Data. Qualification directories use the suffix
 `Beta_0.0.51-qualification-20261007-172219`. Xbox's read-only bridge builds cleanly;
 its live-account trophy access remains acceptance-test work, not a qualification claim.
+
+The four coordinated releases are published. GitHub asset sizes and digests,
+anonymous extension downloads, the public latest app manifest, and both the
+immutable and raw-main extension catalogues were verified. Live host update
+validation passes with 234 checks and 11 public catalogue entries. Application
+package SHA-256: `1fe454c047cce058c822791a52e5ed8962760d2c15c404c129a1f544599bfaa9`.
