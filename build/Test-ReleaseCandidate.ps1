@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$WorkspaceRoot = 'C:\Development\Osiris Launcher', [string]$Version = 'Beta_0.0.50', [string]$PreviousVersion = 'Beta_0.0.49')
+param([string]$WorkspaceRoot = 'C:\Development\Osiris Launcher', [string]$Version = 'Beta_0.0.51', [string]$PreviousVersion = 'Beta_0.0.50')
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -24,9 +24,21 @@ foreach ($target in @($cleanRoot, $upgradeRoot)) {
 }
 [IO.Compression.ZipFile]::ExtractToDirectory($archive, $cleanRoot)
 [IO.Compression.ZipFile]::ExtractToDirectory((Join-Path $artifacts "Osiris-$PreviousVersion-win-x64.zip"), $upgradeRoot)
-foreach ($extension in @(@('Stats','0.1.3','Stats_511681f5-d2f5-41ae-8b73-fa3adcc86c85'), @('ScreenshotsGallery','0.1.0','ScreenshotsGallery_f3dc3fd5-3d6d-4aa0-8762-2d325bb1d7fe'), @('GameGallery','2.0.4','GameGallery_8e77fe31-5e62-41e2-8fa2-64844cfd5b6b'))) {
+$extensions = @(
+    @('Stats','0.1.3','Stats_511681f5-d2f5-41ae-8b73-fa3adcc86c85','Extras','Stats'),
+    @('ScreenshotsGallery','0.1.0','ScreenshotsGallery_f3dc3fd5-3d6d-4aa0-8762-2d325bb1d7fe','Extras','Screenshots Gallery'),
+    @('GameGallery','2.0.4','GameGallery_8e77fe31-5e62-41e2-8fa2-64844cfd5b6b','Extras','Game Gallery'),
+    @('Trophies','0.1.0','Trophies_72ba1fc9-490b-4fa4-96f0-0a154b56c1db','Extras','Trophies'),
+    @('Exophase','0.2.7','Exophase_26131977-669a-4ef7-a66c-026122a24089','Extras','Exophase'),
+    @('SteamLibrary','1.0.3','SteamLibrary_cb91dfc9-b977-43bf-8e70-55f46e410fab','Libraries','Steam Library'),
+    @('XboxLibrary','1.0.2','XboxLibrary_7e4fbb5e-2ae3-48d4-8ba0-6b30e7a4e287','Libraries','Xbox Library')
+)
+foreach ($extension in $extensions) {
     $package = Join-Path $workspace "GitHub\Extensions\artifacts\$($extension[0])\$($extension[1])\$($extension[0])_$($extension[1]).pext"
-    $extensionRoot = Join-Path $cleanRoot "Data\Extensions\Extras\$($extension[2])"
+    $checksum = Get-Content -LiteralPath "$package.sha256.json" -Raw | ConvertFrom-Json
+    if ($checksum.version -ne $extension[1] -or $checksum.size -ne (Get-Item $package).Length -or
+        $checksum.sha256 -ne (Get-FileHash -LiteralPath $package).Hash.ToLowerInvariant()) { throw "Extension fixture checksum mismatch: $($extension[0])" }
+    $extensionRoot = Join-Path $cleanRoot "Data\Extensions\$($extension[3])\$($extension[2])"
     New-Item -ItemType Directory -Path $extensionRoot -Force | Out-Null
     [IO.Compression.ZipFile]::ExtractToDirectory($package, $extensionRoot)
 }
@@ -51,7 +63,7 @@ for ($attempt=0; $attempt -lt 300; $attempt++) {
 if ((Get-Content -LiteralPath (Join-Path $upgradeRoot 'version.json') -Raw | ConvertFrom-Json).version -ne $Version) { throw 'Upgrade did not install candidate.' }
 if ((Get-FileHash -LiteralPath $sentinel).Hash -ne $sentinelHash -or (Get-FileHash -LiteralPath (Join-Path $oldStatsRoot 'Osiris.Stats.dll')).Hash -ne $oldStatsHash) { throw 'Upgrade modified existing Data.' }
 
-function Test-Startup([string]$Root) {
+function Test-Startup([string]$Root, [switch]$VerifyExtensions) {
     $engines = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'Osiris.DesktopEngine.exe' })
     if ($engines.Count -ne 0) { throw 'Another Osiris engine is active; refusing shared-IPC test.' }
     $wrapper = Start-Process -FilePath (Join-Path $Root 'Osiris.exe') -ArgumentList '--skipupdatecheck' -WindowStyle Hidden -PassThru
@@ -66,15 +78,25 @@ function Test-Startup([string]$Root) {
         if (-not (Test-Path $log)) { throw 'Startup log missing.' }
         if (Select-String -LiteralPath $log -Pattern 'FATAL|Unhandled|Error loading plugin|Exception.*Xaml|Failed to load.*extension' -Quiet) { throw "Startup errors: $log" }
         if (Select-String -LiteralPath $log -SimpleMatch 'G:\Gaming\Apps\Osiris Launcher App' -Quiet) { throw 'Personal path leaked into startup.' }
+        if ($VerifyExtensions) {
+            foreach ($extension in $extensions) {
+                if (-not (Select-String -LiteralPath $log -SimpleMatch "Loaded plugin: $($extension[4]), version $($extension[1])" -Quiet)) {
+                    throw "Coordinated extension did not load: $($extension[4]) $($extension[1])"
+                }
+            }
+        }
         Write-Output "Startup validated: $Root"
     } finally {
         $engine = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'Osiris.DesktopEngine.exe' })
         if ($engine.Count -eq 1 -and $engine[0].ExecutablePath -eq (Join-Path $Root 'App\Osiris.DesktopEngine.exe')) {
             Start-Process -FilePath (Join-Path $Root 'Osiris.exe') -ArgumentList '--skipupdatecheck --shutdown' -WindowStyle Hidden -Wait
             for ($attempt=0; $attempt -lt 100; $attempt++) { if (-not (Get-Process -Id $engine[0].ProcessId -ErrorAction SilentlyContinue)) { break }; Start-Sleep -Milliseconds 100 }
+            for ($attempt=0; $attempt -lt 100; $attempt++) { if (-not (Get-Process -Id $wrapper.Id -ErrorAction SilentlyContinue)) { break }; Start-Sleep -Milliseconds 100 }
+            if (Get-Process -Id $engine[0].ProcessId -ErrorAction SilentlyContinue) { throw 'Sandbox engine did not shut down.' }
+            if (Get-Process -Id $wrapper.Id -ErrorAction SilentlyContinue) { throw 'Sandbox wrapper did not shut down.' }
         }
     }
 }
-Test-Startup $cleanRoot
+Test-Startup $cleanRoot -VerifyExtensions
 Test-Startup $upgradeRoot
 Write-Output "Candidate qualified; clean=$cleanRoot; upgrade=$upgradeRoot; checksum=$($manifest.sha256); Data sentinel and old Stats preserved."

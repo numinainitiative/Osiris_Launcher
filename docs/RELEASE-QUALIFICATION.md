@@ -5,10 +5,11 @@ installation. Its persistent Data profile must never be cleared or included in
 the release archive. The builder verifies disabled inherited program updates,
 branding, privacy exclusions, release metadata and checksums.
 
-`build/Test-ReleaseCandidate.ps1 -Version Beta_0.0.50 -PreviousVersion Beta_0.0.49`
+`build/Test-ReleaseCandidate.ps1 -Version Beta_0.0.51 -PreviousVersion Beta_0.0.50`
 creates fresh qualification directories under `Programming/Sandbox/CleanInstall`
 and `Programming/Sandbox/UpgradeTest`. It checks the candidate archive, loads the
-coordinated Stats/Game Gallery/Screenshots Gallery packages, tests root-wrapper
+coordinated Stats/Game Gallery/Screenshots Gallery/Trophies/Exophase/Steam Library/
+Xbox Library packages, verifies every expected plugin version, tests root-wrapper
 startup, and applies the real candidate through the updater while verifying
 preservation of existing Data and extension files. Extension fixture versions
 in the script must be updated when qualifying later coordinated releases.
@@ -34,3 +35,13 @@ five minutes; an immutable commit URL verifies the published catalog immediately
 Beta 0.0.50 qualification passed: 231 theme checks, 92 Stats insight/settings
 checks, 17 synthetic screenshot collector checks, 36 viewer presentation checks,
 clean startup, real 0.0.49 upgrade with Data preservation, and forced rollback.
+
+Beta 0.0.51 qualification passed: 231 theme/update checks, 33 edition/grid-options/
+starting-page checks, 51 collection checks, 24 screenshot-folder/editor checks,
+27 responsive Details checks, Details lifecycle/artwork policy, 156 Trophies
+checks and 64 Exophase checks. Clean startup loaded all seven coordinated
+extension versions. The real 0.0.50 -> 0.0.51 updater preserved the Data sentinel
+and old Stats installation; forced apply failure restored the previous payload
+without changing Data. Qualification directories use the suffix
+`Beta_0.0.51-qualification-20261007-172219`. Xbox's read-only bridge builds cleanly;
+its live-account trophy access remains acceptance-test work, not a qualification claim.
