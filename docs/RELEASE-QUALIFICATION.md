@@ -5,11 +5,11 @@ installation. Its persistent Data profile must never be cleared or included in
 the release archive. The builder verifies disabled inherited program updates,
 branding, privacy exclusions, release metadata and checksums.
 
-`build/Test-ReleaseCandidate.ps1 -Version Beta_0.0.51 -PreviousVersion Beta_0.0.50`
+`build/Test-ReleaseCandidate.ps1 -Version Beta_0.0.52 -PreviousVersion Beta_0.0.51`
 creates fresh qualification directories under `Programming/Sandbox/CleanInstall`
 and `Programming/Sandbox/UpgradeTest`. It checks the candidate archive, loads the
-coordinated Stats/Game Gallery/Screenshots Gallery/Trophies/Exophase/Steam Library/
-Xbox Library packages, verifies every expected plugin version, tests root-wrapper
+coordinated packages for all 11 catalogued extensions, verifies every expected
+plugin version, tests root-wrapper
 startup, and applies the real candidate through the updater while verifying
 preservation of existing Data and extension files. Extension fixture versions
 in the script must be updated when qualifying later coordinated releases.
@@ -35,6 +35,21 @@ five minutes; an immutable commit URL verifies the published catalog immediately
 Beta 0.0.50 qualification passed: 231 theme checks, 92 Stats insight/settings
 checks, 17 synthetic screenshot collector checks, 36 viewer presentation checks,
 clean startup, real 0.0.49 upgrade with Data preservation, and forced rollback.
+
+Beta 0.0.52 qualification passed on 2026-10-19: 583 theme/settings/update checks,
+69 Exophase, 76 HowLongToBeat, 110 Stats insights, 160 Trophies,
+23 synthetic screenshot collector, 39 screenshot presentation, 30 extension
+navigation, 5 IGN fixtures, 5 Steam metadata matching (including read-only live
+search), 11 time-only action tracking and 6 disposable uninstall checks.
+Clean and real Beta 0.0.51 upgrade startup loaded all 11 catalogued extensions.
+Existing Data and the old Stats extension survived the update; forced updater
+failure restored the previous payload and retained Data. Qualification directories:
+`Beta_0.0.52-qualification-20261019-152724` under CleanInstall and UpgradeTest.
+Package SHA-256: `0f56dd6a70abdce57c122c95574d61d2c2c764a43d2e61b3ce59a17efdc0f9dc`.
+The builder used the prepared Development runtime while theme source consolidation
+remains incomplete; settings/font/navigation source is still in the workspace's
+legacy ThemeSource tree. No private profile is part of the release.
+The inherited IGN AngleSharp 0.9.9 NU1902 advisory remains unchanged.
 
 Beta 0.0.51 qualification passed: 231 theme/update checks, 33 edition/grid-options/
 starting-page checks, 51 collection checks, 24 screenshot-folder/editor checks,

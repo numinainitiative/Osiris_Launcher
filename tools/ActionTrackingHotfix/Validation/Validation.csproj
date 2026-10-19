@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net462</TargetFramework>
+    <UseWPF>true</UseWPF><PlatformTarget>x86</PlatformTarget><LangVersion>latest</LangVersion>
+    <AppRoot>$(MSBuildThisFileDirectory)..\..\..\..\..\Programming\Development\Osiris\App</AppRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Probe\**\*.cs" />
+    <Reference Include="Playnite.SDK"><HintPath>$(AppRoot)\Playnite.SDK.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Playnite"><HintPath>$(AppRoot)\Playnite.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Newtonsoft.Json"><HintPath>$(AppRoot)\Newtonsoft.Json.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

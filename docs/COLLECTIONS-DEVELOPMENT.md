@@ -1,4 +1,4 @@
-# Collection pages (Beta 0.0.51)
+# Collection pages
 
 Click a collection name in Game Details -> Details to open its collection page.
 The banner uses Home's actual hero layout: an 800 px-high, top-aligned image host,
@@ -9,24 +9,39 @@ collection title and game count replace the greeting at Home's 78/85 px anchor.
 Member games' available static backgrounds cycle every 30 seconds, with Home's
 900 ms crossfade. Missing banners leave a neutral background.
 
-The virtualized cover grid overlays the lower hero at Home's 390 px content
-anchor instead of being placed below a short banner. It uses Library's saved vertical column count,
-cover proportions, spacing and rounded-corner resource. Covers open Game Details;
+The cover grid overlays the lower hero at Home's 390 px content anchor instead
+of being placed below a short banner. The current Development fix puts the hero,
+heading and covers inside one page ScrollViewer with Home's 150 px wheel step,
+175 ms smoothing and vertical touch panning. There is no separate cover-list
+scrollbar: the entire page scrolls away together.
+
+It uses Library's saved vertical column count, cover proportions, spacing and
+rounded-corner resource. Portrait display options are shared live with Library:
+titles (including selected editions), playtime and its Most Played-only restriction,
+Ready tags, favourite tags, cover edges and hover animations. Hiding titles
+also removes their reserved space. Collection membership remains alphabetic, so
+the Most Played-only option hides playtime badges on this page. Covers open Game Details;
 Back returns to the collection. Membership is the game's exact native Series ID,
 not a name search or library filter. Hidden games remain excluded. Selected edition
 names are included in cover titles. Other metadata fields remain passive text.
 
-Included in Beta 0.0.51. Opening a collection does not modify
+The initial collection page is included in Beta 0.0.51; the whole-page scrolling
+and display-option follow-up is currently a Development fix, not a new release.
+Opening a collection does not modify
 collection/library data. The page is loaded on demand and releases
-its cover items, banner images, animations and timer when leaving. All art comes
+its cover items, banner images, animations, active scroll and timer when leaving.
+Content-sized wrap rows allow Home-style scrolling; cover artwork is loaded only
+within the viewport and one viewport of preload above/below, and distant artwork
+is released. All art comes
 from the existing local library; no new external fetch or account is needed.
 
 Until theme source consolidation, editable files remain in
 `Development/Contents and Stuff/Development (AI)/Development/ThemeSource`:
 
 - `Code/OsirisCollectionPage.cs`: read-only membership, link behaviour and slideshow.
-- `Views/CollectionPage.xaml`: banner and virtualized grid.
-- `Code/OsirisSidebarBehavior.cs`: identity-aware Back history and page visibility.
+- `Views/CollectionPage.xaml`: shared scroll content and Library portrait options.
+- `Code/OsirisSidebarBehavior.cs`: identity-aware Back history, page visibility and
+  shared Library sizing for content-sized collection rows.
 - `Views/MainWindow.xaml`: collection page host.
 - `Views/DetailsViewGameOverview.xaml`: collection links.
 - `Code/Validation/CollectionPageValidation.csproj`: synthetic membership, XAML,
