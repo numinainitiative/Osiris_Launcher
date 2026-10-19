@@ -1,4 +1,6 @@
-# Shared weekly statistics (Development)
+# Shared weekly statistics
+
+Released in Osiris Beta 0.0.52 with Stats 0.1.4 and Trophies 0.1.1.
 
 The Stats extension owns the weekly snapshot used by both the Stats page and
 Home. Home reads GetHomeWeeklyStatsForOsiris; the Stats page renders that same

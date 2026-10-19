@@ -1,6 +1,6 @@
 # Extension pages and Game Details navigation
 
-Development-only fixes, not yet included in a new public release.
+Released in Osiris Beta 0.0.52 with Exophase 0.2.8 and HowLongToBeat 1.2.5.
 
 Game-title links in Exophase and HowLongToBeat follow Home/Library's native
 Library -> Details -> SelectGameBeforeRender sequence. Details activation can

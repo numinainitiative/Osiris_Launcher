@@ -51,6 +51,15 @@ remains incomplete; settings/font/navigation source is still in the workspace's
 legacy ThemeSource tree. No private profile is part of the release.
 The inherited IGN AngleSharp 0.9.9 NU1902 advisory remains unchanged.
 
+Beta 0.0.52 and all eight coordinated extension releases are published. Both
+application asset sizes and GitHub SHA-256 digests were checked before draft
+promotion. Anonymous full application and extension package downloads match
+their manifests. The public latest application endpoint and both immutable and
+raw-main extension catalogues match all 11 expected versions/checksums. The
+live host suite passes 586 checks. Development was reopened through its root
+wrapper with the original persistent Data path; startup fatal/unhandled/plugin
+error checks passed. The personal installation was not modified.
+
 Beta 0.0.51 qualification passed: 231 theme/update checks, 33 edition/grid-options/
 starting-page checks, 51 collection checks, 24 screenshot-folder/editor checks,
 27 responsive Details checks, Details lifecycle/artwork policy, 156 Trophies

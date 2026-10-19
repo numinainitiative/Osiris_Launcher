@@ -1,4 +1,7 @@
-# Per-action tracking opt-out (Development)
+# Per-action tracking opt-out
+
+Released in Osiris Beta 0.0.52. The deployment procedure below also documents
+the original Development implementation and its safety boundaries.
 
 Game Edit → Actions → Tracking Mode now includes **Disabled (time only)** for File/URL play
 actions. Set it on the Steam launch action while leaving the direct executable
@@ -24,7 +27,7 @@ game detection, screenshots, play count, last played and lifecycle events remain
   Existing canonical combo styling/bindings are retained. It restores saved
   selection and avoids duplicate entries; other action choices are untouched.
 - The SDK enum is **not modified**: inherited values 0–4 (including ProcessName)
-  remain unchanged. Value 5 is reserved by this Development-only patch. JSON
+  remain unchanged. Value 5 is reserved by this Osiris runtime patch. JSON
   save/reload and native launch cloning preserve it. Emulator/script editors do
   not expose this unsupported choice.
 - `tools/ActionTrackingHotfix` checks value 5 is unused, validates the inherited
