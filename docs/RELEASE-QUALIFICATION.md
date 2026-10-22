@@ -21,7 +21,8 @@ points to 0.0.53. Anonymous Fun Games package download matches its checksum;
 both immutable and raw-main catalogs expose all 12 public entries. The optional
 live host suite hit GitHub's anonymous API rate limit after release verification;
 the 685 isolated checks remain passing. Full application anonymous-download
-verification is pending delivery-server response. Development was reopened with
+verification subsequently completed and matches the candidate SHA-256.
+Development was reopened with
 its original Data and Fun Games 0.3.2; personal installation remains untouched.
 
 Build candidates with `build/New-OsirisRelease.ps1` from the prepared Development
