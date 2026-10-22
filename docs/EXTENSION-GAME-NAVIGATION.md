@@ -1,5 +1,28 @@
 # Extension pages and Game Details navigation
 
+## Extension subpages (Osiris Beta 0.0.53)
+
+The search-panel Back action now lets the currently visible installed extension
+handle a nested page before consuming host history. A global page can expose
+`public bool OsirisTryNavigateBack()` on its UserControl. Return true only when
+the page handled a local Back action; false allows the normal host history path.
+The host probes only visible controls while the current entry has an extension
+identity. Hidden/unloaded views are excluded. Missing callbacks, false results,
+and exceptions fall through safely; no other navigation changes.
+
+Fun Games0.2.1 uses this to discard an inline builder draft before returning from
+Roulette to the Fun Games hub. At the hub it returns false. There is no duplicate
+Back to games button. Removing the nested content triggers its existing animation
+cancellation/image cleanup. Saved roulettes are not modified by navigation.
+
+Host implementation remains in legacy ThemeSource/Code/OsirisSidebarBehavior.cs;
+build and deploy all three theme DLLs to Development with verified backups.
+Extension implementation is authoritative in Extensions/extensions/FunGames.
+UpdateChecksValidation adds six contract checks (handled/local state, ordinary
+history fallback, unsupported/null page, error fallback, and invisible-page
+exclusion); existing navigation and all other regression checks remain active.
+No public release or personal installation changes accompany this work.
+
 Released in Osiris Beta 0.0.52 with Exophase 0.2.8 and HowLongToBeat 1.2.5.
 
 Game-title links in Exophase and HowLongToBeat follow Home/Library's native

@@ -1,5 +1,20 @@
 # Release qualification
 
+Beta 0.0.53 qualification passed on 22 October 2026. Candidate SHA-256:
+`644e238e0adea5e06e1d1272a85853a23f6abd32585b31b4ce9539d458011fbe`.
+Clean installation loaded all 12 coordinated extensions including Fun Games
+0.3.2. Real 0.0.52 upgrade preserved the Data sentinel and existing Stats files;
+forced updater failure restored the previous payload without changing Data.
+Qualification directories: `Beta_0.0.53-qualification-20261022-171650` under
+CleanInstall and UpgradeTest. Passed 685 theme/font/navigation checks, 52 Details
+card editor checks, 27 responsive layout checks, Details lifecycle/artwork
+cleanup and 1,436 Fun Games model/WPF checks. Package privacy/checksum tests
+passed; inherited program updates remain disabled. Built from prepared
+Development App while theme source remains in the legacy ThemeSource tree.
+Fun Games is original MIT code with Lucide ISC notices; its five-file package
+contains no live roulette files, local library artwork, profile or credentials.
+No personal installation was used or modified.
+
 Build candidates with `build/New-OsirisRelease.ps1` from the prepared Development
 installation. Its persistent Data profile must never be cleared or included in
 the release archive. The builder verifies disabled inherited program updates,

@@ -1,12 +1,13 @@
 [CmdletBinding()]
-param([string]$WorkspaceRoot = 'C:\Development\Osiris Launcher', [string]$Version = 'Beta_0.0.52', [string]$PreviousVersion = 'Beta_0.0.51')
+param([string]$WorkspaceRoot = 'C:\Development\Osiris Launcher', [string]$Version = 'Beta_0.0.53', [string]$PreviousVersion = 'Beta_0.0.52', [string]$CandidateDirectory)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $workspace = [IO.Path]::GetFullPath($WorkspaceRoot).TrimEnd('\')
 $artifacts = Join-Path $repositoryRoot 'artifacts'
-$archive = Join-Path $artifacts "Osiris-$Version-win-x64.zip"
-$manifestPath = Join-Path $artifacts "Osiris-$Version-win-x64.json"
+if ([string]::IsNullOrWhiteSpace($CandidateDirectory)) { $CandidateDirectory = $artifacts }
+$archive = Join-Path $CandidateDirectory "Osiris-$Version-win-x64.zip"
+$manifestPath = Join-Path $CandidateDirectory "Osiris-$Version-win-x64.json"
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifest.sha256) { throw 'Candidate checksum mismatch.' }
 $zip = [IO.Compression.ZipFile]::OpenRead($archive)
@@ -25,6 +26,7 @@ foreach ($target in @($cleanRoot, $upgradeRoot)) {
 [IO.Compression.ZipFile]::ExtractToDirectory($archive, $cleanRoot)
 [IO.Compression.ZipFile]::ExtractToDirectory((Join-Path $artifacts "Osiris-$PreviousVersion-win-x64.zip"), $upgradeRoot)
 $extensions = @(
+    @('FunGames','0.3.2','FunGames_9ac287c1-0c9c-4453-b668-9857c4e7d7e6','Extras','Fun Games'),
     @('Stats','0.1.4','Stats_511681f5-d2f5-41ae-8b73-fa3adcc86c85','Extras','Stats'),
     @('ScreenshotsGallery','0.1.1','ScreenshotsGallery_f3dc3fd5-3d6d-4aa0-8762-2d325bb1d7fe','Extras','Screenshots Gallery'),
     @('GameGallery','2.0.5','GameGallery_8e77fe31-5e62-41e2-8fa2-64844cfd5b6b','Extras','Game Gallery'),
