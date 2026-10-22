@@ -15,6 +15,15 @@ Fun Games is original MIT code with Lucide ISC notices; its five-file package
 contains no live roulette files, local library artwork, profile or credentials.
 No personal installation was used or modified.
 
+Beta 0.0.53 and Fun Games 0.3.2 are published. GitHub uploaded asset sizes and
+SHA-256 digests match the local artifacts, and the public latest app endpoint
+points to 0.0.53. Anonymous Fun Games package download matches its checksum;
+both immutable and raw-main catalogs expose all 12 public entries. The optional
+live host suite hit GitHub's anonymous API rate limit after release verification;
+the 685 isolated checks remain passing. Full application anonymous-download
+verification is pending delivery-server response. Development was reopened with
+its original Data and Fun Games 0.3.2; personal installation remains untouched.
+
 Build candidates with `build/New-OsirisRelease.ps1` from the prepared Development
 installation. Its persistent Data profile must never be cleared or included in
 the release archive. The builder verifies disabled inherited program updates,
