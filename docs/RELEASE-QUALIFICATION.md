@@ -12,6 +12,13 @@ layout checks passed against the Development runtime. Existing extension package
 versions remain unchanged. Personal installation was closed by the user for
 shared-IPC safety; its files were not modified.
 
+Beta 0.0.54 is published as latest, source commit `bdafc90`. Both uploaded
+asset sizes and GitHub SHA-256 digests were verified before draft promotion.
+Development was reopened through its root wrapper with the original Data path;
+startup completed without fatal/unhandled/plugin load failures. Extension
+packages/catalog are unchanged. Anonymous manifest and full package downloads
+both match the local SHA-256 checksums.
+
 Beta 0.0.53 qualification passed on 22 October 2026. Candidate SHA-256:
 `644e238e0adea5e06e1d1272a85853a23f6abd32585b31b4ce9539d458011fbe`.
 Clean installation loaded all 12 coordinated extensions including Fun Games
