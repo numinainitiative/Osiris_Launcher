@@ -7,9 +7,11 @@ square dashed outlines (3px stroke, 10/6 pattern), four thick directional arrows
 and a centred 144px dimmed square. Details cards have no delete buttons.
 The hero artwork/logo, play panel and hero statistics are not editable here.
 
-Up/down reorder visible cards. Left/right transfer a card between the two
-columns at a corresponding visible position. In narrow single-column layout,
-left/right disable and up/down operate across the combined flow. Hidden extension
+Development correction (22 October, not in the existing 0.0.53 assets): up/down
+reorder visible cards within their original column. Left/right controls are
+removed, including in narrow layout. The secondary cards are discovered inside
+their nested shared panel so each receives its own edit box. Old cross-column
+saved layouts normalize to original columns without losing cards. Hidden extension
 cards remain hidden and retain their saved position until available again.
 
 Click the header button again to Save. Leaving the page or switching games

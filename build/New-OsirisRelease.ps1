@@ -238,6 +238,19 @@ foreach ($setting in @{
 $commonConfig.Save($commonConfigPath)
 
 $desktopThemeRoot = Join-Path $destinationApp 'Themes\Desktop\Default'
+# All shell surfaces use the exact accepted executable icon, including legacy
+# tray colour aliases so saved White/Black preferences cannot restore old art.
+foreach ($iconName in @('applogo.ico', 'applogo_white.ico', 'applogo_black.ico')) {
+    $shellIcon = Join-Path $desktopThemeRoot ('Images\' + $iconName)
+    Copy-Item -LiteralPath $brandingIcon -Destination $shellIcon -Force
+    if ((Get-FileHash -LiteralPath $shellIcon).Hash.ToLowerInvariant() -ne $acceptedBrandingIconHash) {
+        throw "Release shell icon differs from executable branding: $iconName"
+    }
+}
+& dotnet run --project $brandingTool --configuration Release -- $brandingIcon $stagedDesktopEngine $stagedFullscreenEngine
+if ($LASTEXITCODE -ne 0) { throw 'Engine shell-icon patch failed.' }
+& dotnet run --project $brandingTool --configuration Release -- --verify $brandingIcon $stagedDesktopEngine $stagedFullscreenEngine
+if ($LASTEXITCODE -ne 0) { throw 'Engine shell-icon verification failed.' }
 $rajdhaniFontDirectory = Join-Path $desktopThemeRoot 'Fonts'
 $requiredRajdhaniAssets = @(
     'Rajdhani-Light.ttf',

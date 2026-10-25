@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$WorkspaceRoot = 'C:\Development\Osiris Launcher', [string]$Version = 'Beta_0.0.53', [string]$PreviousVersion = 'Beta_0.0.52', [string]$CandidateDirectory)
+param([string]$WorkspaceRoot = 'C:\Development\Osiris Launcher', [string]$Version = 'Beta_0.0.54', [string]$PreviousVersion = 'Beta_0.0.53', [string]$CandidateDirectory)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -24,6 +24,10 @@ foreach ($target in @($cleanRoot, $upgradeRoot)) {
     New-Item -ItemType Directory -Path $target | Out-Null
 }
 [IO.Compression.ZipFile]::ExtractToDirectory($archive, $cleanRoot)
+$brandingIcon = Join-Path $repositoryRoot 'media\branding\osiris.ico'
+foreach ($name in @('applogo.ico','applogo_white.ico','applogo_black.ico')) {
+    if ((Get-FileHash -LiteralPath (Join-Path $cleanRoot "App\Themes\Desktop\Default\Images\$name")).Hash -ne (Get-FileHash -LiteralPath $brandingIcon).Hash) { throw "Shell icon mismatch: $name" }
+}
 [IO.Compression.ZipFile]::ExtractToDirectory((Join-Path $artifacts "Osiris-$PreviousVersion-win-x64.zip"), $upgradeRoot)
 $extensions = @(
     @('FunGames','0.3.2','FunGames_9ac287c1-0c9c-4453-b668-9857c4e7d7e6','Extras','Fun Games'),

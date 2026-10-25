@@ -1,5 +1,17 @@
 # Release qualification
 
+Beta 0.0.54 qualification passed on 25 October 2026. Candidate SHA-256:
+`93b3145619ae3ff4719f370b5b661cc1fd9ec64495bd2ca0d0c1f4ecfb4273de`.
+Clean installation loaded all 12 coordinated plugins. Upgrade from 0.0.53
+preserved Data sentinel and old Stats extension files; forced rollback passed.
+Suffix: `Beta_0.0.54-qualification-20261025-155009`. All shell icon aliases
+match the executable icon byte-for-byte, and both engines' native icon groups
+match all nine accepted frame sizes. Inherited updates remain disabled.
+687 host checks, 65 Details layout checks, 72 collection checks and 27 responsive
+layout checks passed against the Development runtime. Existing extension package
+versions remain unchanged. Personal installation was closed by the user for
+shared-IPC safety; its files were not modified.
+
 Beta 0.0.53 qualification passed on 22 October 2026. Candidate SHA-256:
 `644e238e0adea5e06e1d1272a85853a23f6abd32585b31b4ce9539d458011fbe`.
 Clean installation loaded all 12 coordinated extensions including Fun Games
