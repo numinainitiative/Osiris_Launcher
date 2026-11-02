@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$WorkspaceRoot = 'C:\Development\Osiris Launcher', [string]$Version = 'Beta_0.0.54', [string]$PreviousVersion = 'Beta_0.0.53', [string]$CandidateDirectory)
+param([string]$WorkspaceRoot = 'C:\Development\Osiris Launcher', [string]$Version = 'Beta_0.0.55', [string]$PreviousVersion = 'Beta_0.0.54', [string]$CandidateDirectory)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))

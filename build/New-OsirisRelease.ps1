@@ -121,6 +121,20 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Release validation failed; inherited program updates are not disabled.'
 }
 
+$launchLifecycleHelper = Join-Path $sourceApp 'Osiris.LaunchLifecycle.dll'
+if (-not (Test-Path -LiteralPath $launchLifecycleHelper -PathType Leaf)) {
+    throw 'Release validation failed; explicit executable tracking helper is missing.'
+}
+& dotnet run --project (Join-Path $repositoryRoot 'tools\SteamLaunchHotfix\SteamLaunchHotfix.csproj') --configuration Release -- `
+    --verify $sourceCoreAssembly $launchLifecycleHelper $sourceCoreAssembly
+if ($LASTEXITCODE -ne 0) { throw 'Release validation failed; executable tracking core/helper do not match.' }
+$themeHash = (Get-FileHash -LiteralPath (Join-Path $sourceApp 'OsirisTheme.dll')).Hash
+foreach ($relativeTheme in @('Themes\Desktop\Default\OsirisTheme.dll', 'Themes\Desktop\Default\CustomControls\OsirisTheme.dll')) {
+    if ((Get-FileHash -LiteralPath (Join-Path $sourceApp $relativeTheme)).Hash -ne $themeHash) {
+        throw 'Release validation failed; theme DLL copies differ.'
+    }
+}
+
 $versionMetadata = Get-Content -LiteralPath $versionFile -Raw | ConvertFrom-Json
 $version = [string]$versionMetadata.version
 if ($version -cnotmatch '^(Alpha|Beta|Stable)_\d+\.\d+\.\d+$') {

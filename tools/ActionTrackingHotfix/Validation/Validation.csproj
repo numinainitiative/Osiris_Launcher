@@ -5,6 +5,7 @@
     <AppRoot>$(MSBuildThisFileDirectory)..\..\..\..\..\Programming\Development\Osiris\App</AppRoot>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="C:\Development\Osiris Launcher\GitHub\Extensions\extensions\ScreenshotsGallery\source\ScreenshotCollector.cs" Link="ScreenshotCollector.cs" />
     <Compile Remove="Probe\**\*.cs" />
     <Reference Include="Playnite.SDK"><HintPath>$(AppRoot)\Playnite.SDK.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Playnite"><HintPath>$(AppRoot)\Playnite.dll</HintPath><Private>false</Private></Reference>

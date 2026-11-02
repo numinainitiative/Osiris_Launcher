@@ -1,5 +1,52 @@
 # Per-action tracking opt-out
 
+## Independent executable and playtime (Beta 0.0.55)
+
+File/URL play actions now expose Launching path, Tracking path and Track playtime.
+The launch path/arguments still start Steam, a launcher or the game as before.
+Tracking path browses for the actual game `.exe`; blank retains automatic
+detection. Track playtime controls only elapsed-time persistence. New selections
+are stored per action/edition using existing GameAction fields, so native editor
+Save/Cancel and JSON cloning remain transactional. No live game/action is migrated.
+
+The adapter keeps legacy enum entries internally but hides the visible tracking
+mode selector in favour of a canonical action-editor checkbox. Legacy modes0–5
+retain their saved values until edited. Reserved6/7 mean exact executable with
+time enabled/disabled; the runtime patch rejects SDK collisions. Normalization
+validates the target exists before launching and edits only the expanded clone,
+never the saved SourceAction. Both flags use the exact full executable path via
+QueryFullProcessImageName (including x64 games from the x86 host), not merely a
+filename or parent/launcher process tree. The game emits one Started event when
+the target appears and one Stopped event after exit, with a two-second exit
+debounce. Startup waits at most three minutes before the native failure path.
+Native lifecycle continues to drive screenshots, play count and last played;
+the existing stop-time suppression additionally recognizes7, but not6.
+
+Original code: `src/Osiris.LaunchLifecycle`; guarded core patcher:
+`tools/SteamLaunchHotfix`. The historical SteamSession type/tool names remain
+internal identifiers only: this feature is explicitly selected by tracking path,
+works for non-Steam launchers too, and does not auto-detect Steam actions.
+Deploy matched Playnite.dll, Osiris.LaunchLifecycle.dll and all three theme DLL
+copies together after verified backups; never apply the theme alone. This was
+introduced in Development on 1 November and is included in Beta0.0.55. Earlier
+experimental Screenshots Gallery changes remain unapplied and are not needed:
+the existing collector works through the repaired native lifecycle.
+
+Validation passed 46 action/lifecycle/UI checks, including a short-lived launcher
+spawning the selected executable and screenshot collection with playtime both
+enabled and disabled. Existing theme checks passed (687 host, 65 Details, 72
+Collection, 27 responsive). Development was deployed with checksum backups on
+1 November. Its first restart exposed an unrelated existing cross-thread error
+in startup library refresh; the affected method's IL matches the prior backup.
+Development was reopened through its root wrapper with `--nolibupdate` for that
+launch only, with its existing Data path and no new startup errors. The separate
+refresh error was fixed for Beta0.0.55 by moving MainWindow access onto the
+application dispatcher. A background-event regression passes, and Development
+now completes normal Steam/Xbox import and install-size scanning without the
+workaround or startup errors. No saved refresh setting was changed.
+
+## Earlier time-only implementation (Beta 0.0.52)
+
 Released in Osiris Beta 0.0.52. The deployment procedure below also documents
 the original Development implementation and its safety boundaries.
 

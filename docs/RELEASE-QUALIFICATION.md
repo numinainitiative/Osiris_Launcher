@@ -1,5 +1,24 @@
 # Release qualification
 
+Beta 0.0.55 qualification passed on 2 November 2026. Candidate SHA-256:
+`322c628c948195f022f5d1bbfb9fec8b02f4502e4fdeff81ef7c5d2a113e5723`.
+Clean installation loaded all twelve current extension fixtures. Real upgrade
+from 0.0.54 preserved the Data sentinel and existing Stats files. Forced updater
+failure rolled back without changing Data. Suffix:
+`Beta_0.0.55-qualification-20261102-204004`. Package privacy, checksums, matched
+tracking helper/core, identical theme DLL copies, shell branding and inherited
+update/protocol guards passed. No extension packages/catalog changed.
+
+Passed 55 isolated edition/profile/copy/metadata-dispatch checks, 46 native
+action/lifecycle/UI checks, 687 host/settings, 65 Details, 72 Collection, 27
+responsive and 33 legacy compatibility checks. Startup metadata's background
+event now obtains MainWindow only on the application dispatcher; a regression
+uses an unshown WPF window and a background task. Development completed normal
+Steam/Xbox import and install-size scan with no fatal/unhandled/errors, without
+the earlier `--nolibupdate` workaround. Its reusable Data was preserved. Personal
+installation was not used or modified. Candidate is ready for draft upload and
+asset verification before publication.
+
 Beta 0.0.54 qualification passed on 25 October 2026. Candidate SHA-256:
 `93b3145619ae3ff4719f370b5b661cc1fd9ec64495bd2ca0d0c1f4ecfb4273de`.
 Clean installation loaded all 12 coordinated plugins. Upgrade from 0.0.53

@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup><TargetFramework>net462</TargetFramework><LangVersion>latest</LangVersion><AssemblyName>Osiris.LaunchLifecycle</AssemblyName></PropertyGroup>
+ <ItemGroup><Reference Include="Playnite.SDK"><HintPath>../../../../Programming/Development/Osiris/App/Playnite.SDK.dll</HintPath><Private>false</Private></Reference></ItemGroup>
+</Project>
