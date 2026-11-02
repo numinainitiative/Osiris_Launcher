@@ -16,8 +16,18 @@ event now obtains MainWindow only on the application dispatcher; a regression
 uses an unshown WPF window and a background task. Development completed normal
 Steam/Xbox import and install-size scan with no fatal/unhandled/errors, without
 the earlier `--nolibupdate` workaround. Its reusable Data was preserved. Personal
-installation was not used or modified. Candidate is ready for draft upload and
-asset verification before publication.
+installation was not used or modified.
+
+Beta 0.0.55 is published as latest, source commit `649cbd8`. Uploaded asset sizes
+and GitHub SHA-256 digests matched the local qualified files before promotion.
+Anonymous latest/manifest requests passed, and a public archive byte range
+matches the qualified ZIP. Full anonymous archive downloads stalled on the local
+connection and were stopped; a completed anonymous full-file hash check is not
+claimed. The whole-asset GitHub digest does match the qualified package hash.
+The initial VPN-bound upload was slow; the direct retry completed in about a
+minute. No delta/CI transport was published. Development is reopened normally
+with its original Data and updated 0.0.55 root/footer version. Extensions and
+personal installation remain unchanged.
 
 Beta 0.0.54 qualification passed on 25 October 2026. Candidate SHA-256:
 `93b3145619ae3ff4719f370b5b661cc1fd9ec64495bd2ca0d0c1f4ecfb4273de`.
