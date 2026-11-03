@@ -87,6 +87,8 @@ namespace OsirisTheme
                     var label = button.Content;
                     button.Content = null;
                     var grid = new Grid { ClipToBounds = false };
+                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                     if (label is UIElement element) grid.Children.Add(element);
                     else grid.Children.Add(new TextBlock { Text = Convert.ToString(label), VerticalAlignment = VerticalAlignment.Center });
                     var canvas = new Canvas { Width = 24, Height = 24 };
@@ -95,9 +97,10 @@ namespace OsirisTheme
                         "M14,11 a5,5 0 0 0 -7.54,-0.54 l-3,3 a5,5 0 0 0 7.07,7.07 l1.71,-1.71" })
                         canvas.Children.Add(new System.Windows.Shapes.Path { Data = Geometry.Parse(data), Stroke = new SolidColorBrush(Color.FromRgb(78, 205, 128)),
                             StrokeThickness = 2, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round });
-                    var badge = new Viewbox { Width = 18, Height = 18, Child = canvas, HorizontalAlignment = HorizontalAlignment.Left,
-                        VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14 - button.Padding.Left, 0, 0, 0),
-                        Visibility = Visibility.Collapsed, IsHitTestVisible = false };
+                    var badge = new Viewbox { Width = 18, Height = 18, Child = canvas, HorizontalAlignment = HorizontalAlignment.Right,
+                        VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 4, 0),
+                        Visibility = Visibility.Collapsed, IsHitTestVisible = false, Tag = "OsirisEditionMirrorBadge" };
+                    Grid.SetColumn(badge, 1);
                     grid.Children.Add(badge); button.Content = grid; mirrorBadges[button] = badge;
                 }
             }

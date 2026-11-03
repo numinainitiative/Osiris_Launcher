@@ -46,7 +46,7 @@ page (General, Advanced, Actions, Links, Scripts, Trophies). Mirrored content is
 read-only; Copy page and an indirect Advanced statistics reset are disabled on
 the dependent edition. Disable mirroring to keep an independently editable copy.
 The supplied `media/icons/edition-link.svg` vector is rendered in green at the
-left edge of mirrored navigation labels. Source pages are not marked as mirrors.
+far right edge of mirrored navigation items. Source pages are not marked as mirrors.
 Pending mirror settings/icons follow each edition's unsaved draft.
 
 Mirrors are directional. The selected edition supplies the page, including
@@ -253,3 +253,5 @@ or screenshots were used; visual acceptance is left to the user.
 Both installations restarted through their root wrappers with correct original Data paths and no core startup errors. Development was then closed; personal was left running for acceptance testing. Personal Trophies 0.1.1 was preserved; this hotfix requires no extension update.
 
 Development footer alignment correction: the previous two-row wrapping layout was replaced with a full-width single horizontal row. XAML parses, named controls/styles are preserved, and the previous runtime XAML is checksum-backed up at `Data/Recovery/ManualFixes/edition-footer-single-row-20261103-175724`. Only Development MainWindow XAML changed; personal/runtime DLLs/data are untouched.
+
+Development mirror indicator alignment: the link badge now occupies a dedicated trailing Auto column, aligned right with a 12px label gap. Labels retain their original left inset. The semantic green badge is excluded from selected/unselected navigation text recoloring. Three runtime DLLs were hash-backed up under `Data/Recovery/ManualFixes/mirror-icon-right-20261103-180632` before deployment; personal installation and Data are unchanged.
