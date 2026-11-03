@@ -49,6 +49,56 @@ metadata picker adaptation. The isolated profile suite now passes 54 checks,
 including identity protection, page boundaries, draft-only changes, independent
 collection/action/link objects and actual native metadata selector behavior.
 
+## Optional shared pages (Beta 0.0.56, 3 November 2026)
+
+The canonical **Share page** action sits next to **Copy page** in the Game Edit
+footer. It currently supports General, Advanced, Actions, Links, Scripts and
+Trophies. Other pages retain their independent file/settings ownership. Sharing
+is opt-in for each page and each group of editions; creating an edition never
+links anything automatically. Choose an edition to fill the current draft and
+stage a link, then Save. Cancel or switching editions discards pending links.
+Linked pages show **Shared page**. **Stop sharing (keep a copy)** separates only
+this edition; other linked editions stay linked.
+
+Native pages synchronize only their explicit `EditionPageCopy` field whitelist,
+using SDK game-update events from either edition. Changed fields are deep-copied
+into sibling records. IDs, platform/library ownership, installation, running
+state and unrelated page fields never follow these links. Advanced intentionally
+shares its playtime, play count, last played, completion state, added date,
+favorite/hidden flags and notes. These are mirrored totals, not summed totals.
+Joining or leaving a shared group is blocked while a member is running.
+
+Optional `SharedPages` sets live in the existing schema-4 grouping document.
+Sharing graph writes use the existing recovery snapshots and atomic replacement;
+a failed multi-page sharing change restores the previous graph. The native save
+pipeline retains its existing per-store commit behavior.
+
+Trophies 0.1.2 resolves a single canonical catalogue through the public read-only
+`OsirisTheme.EditionPageSharing.ResolveOwner` bridge. Editor, card, earned-trophy
+Stats bridge, refresh revision and sync all use that owner. Integrated-library
+source filtering uses the canonical profile, so a local edition explicitly linked
+to Steam displays the same actual earned trophies. Sharing previews disable Sync
+until Save; catalogue import remains staged. Cancel does not establish a link or
+write its preview catalogue. Unlinking snapshots catalogue and earned progress,
+including provider provenance; deleting the canonical edition transfers the
+catalogue before removing its native row. Explicit successful sync replaces
+snapshot presentation provenance with the selected profile's own provider.
+
+`EditionPageSharing.cs` is authoritative app source, linked into the theme build.
+Validation: 77 isolated profile/copy/sharing/dispatcher checks, 165 Trophies checks,
+65 Details layout checks and 72 Collection checks. The sharing suite exercises
+real SDK update-event delivery, both directions, third-member joins, restart,
+unlink, running and unrelated-game guards, failed batch rollback, catalogue
+preservation and canonical-member removal. No real games/accounts are changed by
+these tests.
+
+Deployed to Development only after a checksum-verified 13-file, 11,985,696-byte
+backup at `Data/Recovery/ManualFixes/shared-edition-pages-20261103-000533`.
+Development's persistent Data is preserved; personal installation/public releases
+are unchanged. All three theme DLLs, canonical MainWindow XAML and the matching
+Trophies DLL/manifest are deployed together. Visual confirmation is left to the
+user; no mouse movement or screenshots are used.
+
 ## Existing editions and recovery
 
 Schema 3 profiles convert when opened in Game Edit, switched or saved. Opening
@@ -101,3 +151,5 @@ checksum-backed up under `Data/Recovery/ManualFixes/independent-edition-profiles
 intended persistent Development Data path and no new fatal/unhandled errors.
 Visual acceptance is left to the user; no mouse interaction or screenshots were
 used for verification.
+
+Optional shared pages are qualified for Beta 0.0.56 with Trophies 0.1.2; clean startup and the real 0.0.55 upgrade passed.

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -282,6 +282,7 @@ namespace OsirisTheme
         private static void RemoveProfileRecord(GameEditionProfile profile, GameEditionRecord record)
         {
             var database = API.Instance.Database;
+            DetachSharedPagesForRemoval(profile, record.GameProfileId);
             var game = database.Games.Get(record.GameProfileId);
             // Removing a profile is never an uninstall and never traverses InstallDirectory.
             if (game != null)

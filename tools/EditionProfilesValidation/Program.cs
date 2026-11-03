@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -20,6 +20,7 @@ static class Program
     static Type editions;
     static int checks;
     static bool failNextAdd;
+    static EventHandler<ItemUpdatedEventArgs<Game>> gameUpdates;
     static readonly BindingFlags Flags = BindingFlags.Static | BindingFlags.NonPublic;
     sealed class Proxy : RealProxy
     {
@@ -35,11 +36,16 @@ static class Program
                 object value = null;
                 if (role == "games")
                 {
-                    if (call.MethodName == "Get" || call.MethodName == "get_Item")
+                    if (call.MethodName == "add_ItemUpdated") gameUpdates += (EventHandler<ItemUpdatedEventArgs<Game>>)call.Args[0];
+                    else if (call.MethodName == "remove_ItemUpdated") gameUpdates -= (EventHandler<ItemUpdatedEventArgs<Game>>)call.Args[0];
+                    else if (call.MethodName == "Get" || call.MethodName == "get_Item")
                         value = games.TryGetValue((Guid)call.Args[0], out var game) ? game : null;
                     else if (call.MethodName == "Add" || call.MethodName == "Update")
                     {
-                        var game = (Game)call.Args[0]; games[game.Id] = game;
+                        var game = (Game)call.Args[0];
+                        games.TryGetValue(game.Id, out var previous);
+                        games[game.Id] = game;
+                        if (call.MethodName == "Update") gameUpdates?.Invoke(null, new ItemUpdatedEventArgs<Game>(previous, game));
                         if (call.MethodName == "Add" && failNextAdd)
                         { failNextAdd = false; throw new IOException("Injected database write failure"); }
                     }
@@ -53,6 +59,7 @@ static class Program
                     Directory.CreateDirectory((string)value);
                 }
                 if (call.MethodName == "get_IsOpen") value = true;
+                if (call.MethodName == "get_ExtensionsDataPath") value = Path.Combine(sandbox, "extensions-data");
                 if (type.IsInterface && value == null)
                     value = new Proxy(type, call.MethodName == "get_Games" ? "games" : call.MethodName).GetTransparentProxy();
                 else if (type != typeof(void) && type.IsValueType && value == null) value = Activator.CreateInstance(type);
@@ -152,6 +159,7 @@ static class Program
         Check(((IEnumerable)Call("GetEditions", local.Id)).Cast<object>().Count() == 0, "Native removal of final edition clears grouping");
         ValidateLegacy(settings);
         ValidatePageCopy();
+        ValidatePageSharing();
         ValidateBackgroundMetadataQueue();
         ValidateMarkup(args[2]);
         Console.WriteLine("PASS " + checks + " independent edition profile checks; isolated mock database and sandbox files only.");
@@ -253,6 +261,88 @@ static class Program
         var selectedRows = rows.Cast<object>().Where(row => Equals(row.GetType().GetProperty("Selected").GetValue(row), true)).ToList();
         Check(selectedRows.Count == 1 && ((DatabaseObject)selectedRows[0].GetType().GetProperty("Item").GetValue(selectedRows[0])).Id == genre,
             "Native metadata picker selections reflect copied General fields");
+    }
+
+    static void ValidatePageSharing()
+    {
+        games.Clear();
+        var source = new Game { Id = Guid.NewGuid(), Name = "Sharing source", PluginId = Guid.NewGuid(), GameId = "remote-id",
+            Playtime = 1800, PlayCount = 4, Description = "Source description" };
+        games[source.Id] = source;
+        Check((bool)Call("ApplySelection", source.Id, new[] { "Original", "Local", "Third" }), "Create three sharing-test profiles");
+        var members = games.Values.Where(g => g.Id != source.Id).ToList();
+        var local = members[0]; var third = members[1];
+        Check((bool)Call("CanSharePage", "Advanced") && (bool)Call("CanSharePage", "Trophies") && !(bool)Call("CanSharePage", "DangerZone"),
+            "Sharing supports Advanced/Trophies and excludes destructive pages");
+        Check(!(bool)Call("IsPageShared", local.Id, "Advanced"), "New editions remain independent by default");
+        Call("InitializePageSharing");
+        var copier = theme.GetType("OsirisTheme.EditionPageCopy", true).GetMethod("Apply", Flags);
+        var draft = local.GetCopy(); copier.Invoke(null, new object[] { source, draft, "Advanced" });
+        Check(!(bool)Call("IsPageShared", local.Id, "Advanced") && games[local.Id].Playtime == 0,
+            "Filling sharing preview leaves saved graph and native record untouched (Cancel)");
+        Call("CommitPageSharing", local.Id, new Dictionary<string, Guid?> { ["Advanced"] = source.Id });
+        API.Instance.Database.Games.Update(draft);
+        Check((bool)Call("IsPageShared", source.Id, "Advanced") && (Guid)Call("GetSharedPageOwner", local.Id, "Advanced") == source.Id,
+            "Sharing applies to both members, with source as owner");
+        Check(games[local.Id].Playtime == 1800 && games[local.Id].PlayCount == 4, "Selected source supplies initial shared Advanced values");
+        var edit = games[local.Id].GetCopy(); edit.Playtime = 2400; edit.PlayCount = 5;
+        API.Instance.Database.Games.Update(edit);
+        Check(games[source.Id].Playtime == 2400 && games[source.Id].PlayCount == 5,
+            "Actual SDK update event propagates playtime/count from local member");
+        Check(games[source.Id].PluginId == source.PluginId && games[local.Id].PluginId == Guid.Empty && games[source.Id].GameId == "remote-id",
+            "Sharing never changes native profile/integration identities");
+        Check(string.IsNullOrEmpty(games[local.Id].Description) && games[third.Id].Playtime == 0,
+            "Other pages and unlinked third edition remain independent");
+        edit = games[source.Id].GetCopy(); edit.Notes = "Updated from original";
+        API.Instance.Database.Games.Update(edit);
+        Check(games[local.Id].Notes == edit.Notes && games[local.Id].Playtime == 2400,
+            "Bidirectional updates change only modified shared fields");
+        Call("SetPageSharing", third.Id, "Advanced", local.Id);
+        Call("SynchronizeSharedPageFields", null, games[local.Id]);
+        Check(games[third.Id].Playtime == 2400 && (Guid)Call("GetSharedPageOwner", third.Id, "Advanced") == source.Id,
+            "Joining a shared member uses its existing sharing group");
+        editions.GetField("document", Flags).SetValue(null, null);
+        Check((bool)Call("IsPageShared", third.Id, "Advanced"), "Sharing graph survives document reload");
+        Call("SetPageSharing", local.Id, "Advanced", null);
+        edit = games[source.Id].GetCopy(); edit.Playtime = 3000; API.Instance.Database.Games.Update(edit);
+        Check(games[local.Id].Playtime == 2400 && games[third.Id].Playtime == 3000,
+            "Stop sharing retains independent copy and leaves other links intact");
+        var foreign = new Game { Id = Guid.NewGuid(), Name = "Unrelated game" }; games[foreign.Id] = foreign;
+        var rejected = false;
+        try { Call("SetPageSharing", local.Id, "Advanced", foreign.Id); } catch (TargetInvocationException) { rejected = true; }
+        Check(rejected && !(bool)Call("IsPageShared", local.Id, "Advanced"), "Cannot share across unrelated game groups");
+        rejected = false;
+        typeof(Game).GetProperty("IsRunning").SetValue(games[source.Id], true);
+        try { Call("SetPageSharing", local.Id, "Advanced", source.Id); } catch (TargetInvocationException) { rejected = true; }
+        Check(rejected, "Running group blocks sharing changes");
+        typeof(Game).GetProperty("IsRunning").SetValue(games[source.Id], false);
+        rejected = false;
+        try { Call("CommitPageSharing", local.Id, new Dictionary<string, Guid?> { ["General"] = source.Id, ["Advanced"] = foreign.Id }); }
+        catch (TargetInvocationException) { rejected = true; }
+        Check(rejected && !(bool)Call("IsPageShared", local.Id, "General"), "Failed batch restores complete sharing graph");
+        var catalogues = Path.Combine(sandbox, "extensions-data", "72ba1fc9-490b-4fa4-96f0-0a154b56c1db", "catalogues");
+        Directory.CreateDirectory(catalogues);
+        File.WriteAllText(Path.Combine(catalogues, source.Id + ".json"), JsonConvert.SerializeObject(new {
+            AppId = 292030, SharedSourcePluginId = (Guid?)null, NativeProvider = source.PluginId.ToString("D"), Trophies = new[] {
+                new { Id = "earned", Name = "Earned trophy", NativeUnlockedUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) } } }));
+        Call("SetPageSharing", local.Id, "Trophies", source.Id);
+        Check((Guid)Call("GetSharedPageOwner", local.Id, "Trophies") == source.Id, "Linked trophies use a single source catalogue");
+        Call("SetPageSharing", local.Id, "Trophies", null);
+        var retained = JObject.Parse(File.ReadAllText(Path.Combine(catalogues, local.Id + ".json")));
+        Check((Guid)retained["SharedSourcePluginId"] == source.PluginId && retained["Trophies"][0]["NativeUnlockedUtc"] != null,
+            "Unlink preserves earned progress and original provider filtering in independent snapshot");
+        Call("SetPageSharing", local.Id, "Trophies", source.Id);
+        Call("SetPageSharing", third.Id, "Trophies", local.Id);
+        Check((bool)Call("RemoveEdition", source.Id, source.Id, local.Id), "Shared canonical edition can be removed");
+        Check(File.Exists(Path.Combine(catalogues, local.Id + ".json")) &&
+            (Guid)Call("GetSharedPageOwner", third.Id, "Trophies") == local.Id,
+            "Deleting shared canonical member transfers catalogue to survivor");
+        Check(games[third.Id].Playtime == 3000, "Deleting original preserves shared Advanced values");
+        var markup = System.Xml.Linq.XDocument.Load(Path.Combine("Development/Contents and Stuff/Development (AI)/Development/ThemeSource", "Views", "MainWindow.xaml"));
+        var ns = System.Xml.Linq.XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml");
+        var share = markup.Descendants().Single(e => (string)e.Attribute(ns + "Name") == "PART_OsirisGameEditShareEditionPage");
+        Check((string)share.Attribute("Style") == "{StaticResource OsirisGameEditActionButtonStyle}" && (string)share.Attribute("Height") == "38",
+            "Share page reuses canonical Copy page geometry/style");
     }
 
     static void ValidateBackgroundMetadataQueue()

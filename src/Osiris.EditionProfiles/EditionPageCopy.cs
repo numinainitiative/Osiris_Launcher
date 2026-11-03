@@ -35,6 +35,9 @@ namespace OsirisTheme
             }
         }
 
+        internal static string[] GetFields(string page) => Fields.TryGetValue(page ?? "", out var fields)
+            ? fields : new string[0];
+
         // Native metadata selectors maintain their own selection lists until Save.
         internal static void ApplyGeneralSelections(object nativeModel, Game source)
         {
