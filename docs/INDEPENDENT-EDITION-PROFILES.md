@@ -7,7 +7,7 @@ Collections. Switching rebuilds Game Details and every Game Edit page around
 that member's actual database identity; it does not copy fields onto the
 integrated original.
 
-Use Game Edit -> General -> Edition to add/select edition labels, then Save.
+In released 0.0.55/0.0.56, use Game Edit -> General -> Edition to add/select edition labels, then Save. Development now uses the footer controls described below.
 Newly added editions receive a local profile with the game's name and otherwise
 blank metadata, installation and actions. The footer edition selector is
 available on every editor page, including General and Advanced. Each profile
@@ -25,6 +25,61 @@ is removed. Old navigation IDs resolve to the surviving selected profile.
 Removing a profile never invokes uninstall or traverses its install/archive
 directory. Removing the final edition label retains the standalone game; the
 ordinary Remove Game command can remove that final profile separately.
+
+## Development footer and page mirrors (3 November 2026)
+
+General no longer contains an Editions field. The bottom panel contains Add
+Edition, the edition selector, Delete edition immediately after it, and Copy
+page. The footer wraps naturally and reserves space for Save/Cancel. Add Edition
+prompts for a unique name, creates an otherwise-empty local profile (base game
+name retained) and selects it without losing the previous edition's draft.
+Unsaved new editions are removed on Cancel or navigation away. Saving commits
+visited drafts and retains the new profiles. Single-profile games show Standard
+and can add another edition without configuring anything in General.
+
+The old Share page menu is replaced by the canonical switch, label **Enable page
+mirror with** and canonical edition dropdown. Choose a source for each supported
+page (General, Advanced, Actions, Links, Scripts, Trophies). Mirrored content is
+read-only; Copy page and an indirect Advanced statistics reset are disabled on
+the dependent edition. Disable mirroring to keep an independently editable copy.
+The supplied `media/icons/edition-link.svg` vector is rendered in green at the
+left edge of mirrored navigation labels. Source pages are not marked as mirrors.
+Pending mirror settings/icons follow each edition's unsaved draft.
+
+Mirrors are directional. The selected edition supplies the page, including
+Advanced totals; native target updates never overwrite its source. Source chains
+resolve to their ultimate owner. Cycle-producing dropdown choices are excluded,
+and cycles involving multiple unsaved edition drafts are checked before any
+edition is saved. Optional schema-4 PageMirrors maps store target/page/source;
+old SharedPages sets migrate in memory to their canonical source until a later
+normal Save writes the document. Native field whitelists still protect identities,
+library ownership, installation and unrelated pages. Trophies' existing read-only
+host bridge follows the same source, with no extension package change.
+
+Delete edition and Edit Danger Zone remove the explicit editor selection only.
+Library grid/list context-menu removal resolves a grouped/stale navigation ID to
+its active physical edition and deduplicates grouped selections. Legacy overlay
+groups convert with recovery backups before this explicit removal operation,
+so their single old database row cannot accidentally erase the entire group. Other editions
+survive. Confirmation identifies the edition and explains preservation of
+siblings/install/archive folders. Removing a mirror source detaches direct
+dependents with saved native values and a trophy catalogue/progress snapshot;
+remaining chains continue following their surviving source. Installed game files
+are never traversed. Removing the final edition removes the final library entry.
+
+Authoritative integration: EditionEditingControls.cs, EditionPageSharing.cs,
+EditionEditorSession.cs and the legacy controller/MainWindow XAML/profile model.
+119 isolated profile/draft/mirror/UI checks passed, including canonical controls,
+read-only content, green vector badge, cycle guards, target-only removal routing,
+empty independent creation and navigation cleanup. 65 Details/72 Collection
+checks also passed. Development alone received the three matched theme DLLs and
+MainWindow XAML after a checksum-verified 29-file, 6,629,155-byte backup at
+`Data/Recovery/ManualFixes/edition-footer-mirrors-20261103-163725`.
+Final DLL SHA-256: `7a0f1510210009c1b31e991682019b91f2cb0ba3cb01481d2d7a4291e35151b5`.
+Personal runtime hash remains `7028d37633763c89430882d121176649585991a154d47057b22091dc93473b18`.
+No public release or personal file changes; persistent Development Data preserved.
+No mouse movement or screenshots. Development reopened through its root wrapper
+with correct Data path and clean core startup; visual acceptance is left to user.
 
 ## Copy a page from another edition
 
@@ -49,7 +104,7 @@ metadata picker adaptation. The isolated profile suite now passes 54 checks,
 including identity protection, page boundaries, draft-only changes, independent
 collection/action/link objects and actual native metadata selector behavior.
 
-## Optional shared pages (Beta 0.0.56, 3 November 2026)
+## Released 0.0.56 shared pages (historical; replaced in Development)
 
 The canonical **Share page** action sits next to **Copy page** in the Game Edit
 footer. It currently supports General, Advanced, Actions, Links, Scripts and

@@ -10,21 +10,15 @@ using Playnite.SDK.Models;
 
 namespace OsirisTheme
 {
-    // Public, read-only bridge: extensions can resolve a shared page without a
-    // build-time dependency on the host theme or parsing its private document.
     public static class EditionPageSharing
     {
         public static Guid ResolveOwner(Guid gameId, string page) => GameEditions.GetSharedPageOwner(gameId, page);
     }
-
     internal static partial class GameEditions
     {
-        private static bool sharingEventsAttached;
-        private static bool synchronisingSharedPages;
+        private static bool sharingEventsAttached, synchronisingSharedPages;
         private static readonly string[] ShareablePages = { "General", "Advanced", "Actions", "Links", "Scripts", "Trophies" };
-
         internal static bool CanSharePage(string page) => ShareablePages.Contains(page, StringComparer.Ordinal);
-
         internal static void InitializePageSharing()
         {
             lock (SyncRoot)
@@ -34,148 +28,182 @@ namespace OsirisTheme
                 sharingEventsAttached = true;
             }
         }
-
         private static void OnSharedGameUpdated(object sender, ItemUpdatedEventArgs<Game> args)
         {
             if (args?.UpdatedItems == null) return;
             foreach (var change in args.UpdatedItems)
-            {
                 try { SynchronizeSharedPageFields(change.OldData, change.NewData); }
-                catch (Exception error) { Trace.TraceError("Shared edition page update failed: " + error); }
+                catch (Exception error) { Trace.TraceError("Edition page mirror update failed: " + error); }
+        }
+        private static void EnsureMirrors(GameEditionProfile profile)
+        {
+            if (profile == null) return;
+            if (profile.PageMirrors == null) profile.PageMirrors = new Dictionary<Guid, Dictionary<string, Guid>>();
+            // Existing shared groups become directed mirrors of their canonical
+            // source. No files are changed merely by reading the old document.
+            foreach (var page in profile.SharedPages.ToList())
+                foreach (var group in page.Value.Where(g => g != null && g.Count > 1))
+                {
+                    var owner = group.FirstOrDefault(id => API.Instance.Database.Games.Get(id) != null);
+                    if (owner == Guid.Empty) continue;
+                    foreach (var id in group.Where(id => id != owner && profile.Editions.Any(e => e.GameProfileId == id)))
+                    {
+                        if (!profile.PageMirrors.TryGetValue(id, out var mirrors)) profile.PageMirrors[id] = mirrors = new Dictionary<string, Guid>();
+                        if (!mirrors.ContainsKey(page.Key)) mirrors[page.Key] = owner;
+                    }
+                }
+            profile.SharedPages.Clear();
+        }
+        internal static Guid? GetPageMirrorSource(Guid id, string page)
+        {
+            lock (SyncRoot)
+            {
+                var profile = GetProfile(id); EnsureMirrors(profile);
+                return profile != null && page != null && profile.PageMirrors.TryGetValue(id, out var pages) && pages.TryGetValue(page, out var source)
+                    ? (Guid?)source : null;
             }
         }
-
         internal static Guid GetSharedPageOwner(Guid id, string page)
         {
             lock (SyncRoot)
             {
-                var group = SharedGroup(GetProfile(id), id, page);
-                var owner = group?.FirstOrDefault(g => API.Instance.Database.Games.Get(g) != null) ?? Guid.Empty;
-                return owner == Guid.Empty ? id : owner;
+                var seen = new HashSet<Guid>(); var current = id;
+                while (seen.Add(current))
+                {
+                    var next = GetPageMirrorSource(current, page);
+                    if (!next.HasValue || API.Instance.Database.Games.Get(next.Value) == null) return current;
+                    current = next.Value;
+                }
+                return id;
             }
         }
-
-        internal static bool IsPageShared(Guid id, string page)
+        internal static bool IsPageShared(Guid id, string page) => GetPageMirrorSource(id, page).HasValue;
+        internal static void ValidateMirrorDrafts(IDictionary<Guid, Dictionary<string, Guid?>> drafts)
         {
-            lock (SyncRoot) return SharedGroup(GetProfile(id), id, page)?.Count > 1;
+            lock (SyncRoot)
+            {
+                foreach (var group in drafts.GroupBy(d => GetProfile(d.Key)))
+                {
+                    var profile = group.Key; EnsureMirrors(profile);
+                    if (profile == null) continue;
+                    var preview = JsonConvert.DeserializeObject<Dictionary<Guid, Dictionary<string, Guid>>>(JsonConvert.SerializeObject(profile.PageMirrors));
+                    foreach (var draft in group)
+                    {
+                        if (!preview.TryGetValue(draft.Key, out var pages)) preview[draft.Key] = pages = new Dictionary<string, Guid>();
+                        foreach (var page in draft.Value)
+                        {
+                            if (page.Value.HasValue)
+                            {
+                                if (!profile.Editions.Any(e => e.GameProfileId == page.Value.Value)) throw new InvalidOperationException("A mirror source is no longer available.");
+                                pages[page.Key] = page.Value.Value;
+                            }
+                            else pages.Remove(page.Key);
+                        }
+                    }
+                    foreach (var draft in preview)
+                        foreach (var page in draft.Value.Keys)
+                        {
+                            var seen = new HashSet<Guid>(); var id = draft.Key;
+                            while (preview.TryGetValue(id, out var pages) && pages.TryGetValue(page, out var next))
+                            {
+                                if (!seen.Add(id)) throw new InvalidOperationException("The pending page mirrors form a loop. Disable one mirror or choose another source before saving.");
+                                id = next;
+                            }
+                        }
+                }
+            }
         }
-
-        private static List<Guid> SharedGroup(GameEditionProfile profile, Guid id, string page)
-        {
-            if (profile?.IndependentProfiles != true || page == null || profile.SharedPages == null) return null;
-            return profile.SharedPages.TryGetValue(page, out var groups) ? groups.FirstOrDefault(g => g.Contains(id)) : null;
-        }
-
         internal static void CommitPageSharing(Guid id, IDictionary<string, Guid?> changes)
         {
             if (changes == null || changes.Count == 0) return;
             lock (SyncRoot)
             {
-                var profile = GetProfile(id);
+                var profile = GetProfile(id); EnsureMirrors(profile);
                 if (profile == null) throw new InvalidOperationException("This edition is no longer available.");
-                var previous = JsonConvert.SerializeObject(profile.SharedPages);
+                var previous = JsonConvert.SerializeObject(profile.PageMirrors);
                 try { foreach (var change in changes) SetPageSharing(id, change.Key, change.Value); }
                 catch
                 {
-                    profile.SharedPages = JsonConvert.DeserializeObject<Dictionary<string, List<List<Guid>>>>(previous);
-                    Save();
-                    throw;
+                    profile.PageMirrors = JsonConvert.DeserializeObject<Dictionary<Guid, Dictionary<string, Guid>>>(previous);
+                    Save(); throw;
                 }
             }
         }
-
-        // Called only after the editor commits. Merely opening a menu or copying
-        // into a draft never changes the sharing graph or another edition.
         internal static void SetPageSharing(Guid id, string page, Guid? sourceId)
         {
-            if (!CanSharePage(page)) throw new InvalidOperationException("Sharing is unavailable for this page.");
+            if (!CanSharePage(page)) throw new InvalidOperationException("Mirroring is unavailable for this page.");
             lock (SyncRoot)
             {
-                var profile = GetProfile(id);
+                var profile = GetProfile(id); EnsureMirrors(profile);
                 var current = API.Instance?.Database?.Games?.Get(id);
                 if (profile?.IndependentProfiles != true || current == null || GroupIsRunning(profile, current))
-                    throw new InvalidOperationException("Stop the game before changing shared pages.");
-                if (sourceId.HasValue && (sourceId == id || !profile.Editions.Any(e => e.GameProfileId == sourceId) ||
-                    API.Instance.Database.Games.Get(sourceId.Value) == null))
-                    throw new InvalidOperationException("Choose another edition of this game.");
-                var before = JsonConvert.SerializeObject(profile.SharedPages);
+                    throw new InvalidOperationException("Stop the game before changing page mirrors.");
+                if (sourceId.HasValue)
+                {
+                    if (sourceId == id || !profile.Editions.Any(e => e.GameProfileId == sourceId) || API.Instance.Database.Games.Get(sourceId.Value) == null)
+                        throw new InvalidOperationException("Choose another edition of this game.");
+                    var seen = new HashSet<Guid> { id }; var check = sourceId;
+                    while (check.HasValue)
+                    {
+                        if (!seen.Add(check.Value)) throw new InvalidOperationException("These editions would mirror each other in a loop. Choose another source.");
+                        check = GetPageMirrorSource(check.Value, page);
+                    }
+                }
+                var previous = JsonConvert.SerializeObject(profile.PageMirrors);
                 BackupProfiles(profile);
                 try
                 {
-                    var old = SharedGroup(profile, id, page);
                     var oldOwner = GetSharedPageOwner(id, page);
-                    // Keep a recoverable independent snapshot on both departure
-                    // and deletion of the canonical member.
-                    if (old != null)
-                    {
-                        CopySharedPageResources(oldOwner, id, page);
-                        if (oldOwner == id && old.Count > 1) CopySharedPageResources(id, old.First(g => g != id), page);
-                        old.Remove(id);
-                    }
-                    if (!profile.SharedPages.TryGetValue(page, out var groups))
-                        profile.SharedPages[page] = groups = new List<List<Guid>>();
-                    groups.RemoveAll(g => g.Count < 2);
-                    if (sourceId.HasValue)
-                    {
-                        var destination = SharedGroup(profile, sourceId.Value, page);
-                        if (destination == null) groups.Add(destination = new List<Guid> { sourceId.Value });
-                        destination.Add(id);
-                    }
+                    if (oldOwner != id) CopySharedPageResources(oldOwner, id, page);
+                    if (!profile.PageMirrors.TryGetValue(id, out var pages)) profile.PageMirrors[id] = pages = new Dictionary<string, Guid>();
+                    if (sourceId.HasValue) pages[page] = sourceId.Value;
+                    else pages.Remove(page);
                     Save();
                 }
                 catch
                 {
-                    profile.SharedPages = JsonConvert.DeserializeObject<Dictionary<string, List<List<Guid>>>>(before);
+                    profile.PageMirrors = JsonConvert.DeserializeObject<Dictionary<Guid, Dictionary<string, Guid>>>(previous);
                     throw;
                 }
             }
             RaiseChanged();
         }
-
-        // A native playtime/import/editor update can originate from either member.
-        // Mirror only changed whitelisted fields, never a whole stale Game clone.
+        // Resolve every dependent against the authoritative source. A native
+        // update on a mirrored target must never write back into its source.
         internal static void SynchronizeSharedPageFields(Game before, Game after)
         {
             if (after == null) return;
             lock (SyncRoot)
             {
                 if (synchronisingSharedPages) return;
-                var profile = GetProfile(after.Id);
+                var profile = GetProfile(after.Id); EnsureMirrors(profile);
                 if (profile?.IndependentProfiles != true) return;
                 synchronisingSharedPages = true;
                 try
                 {
-                    var targets = new Dictionary<Guid, Game>();
-                    foreach (var page in ShareablePages.Where(p => p != "Trophies"))
+                    foreach (var entry in profile.PageMirrors.ToList())
                     {
-                        var members = SharedGroup(profile, after.Id, page);
-                        if (members == null) continue;
-                        foreach (var field in EditionPageCopy.GetFields(page))
+                        var saved = API.Instance.Database.Games.Get(entry.Key);
+                        if (saved == null) continue;
+                        var target = saved.GetCopy(); var changed = false;
+                        foreach (var page in entry.Value.Keys.Where(p => p != "Trophies").ToList())
                         {
-                            var property = typeof(Game).GetProperty(field);
-                            var value = JToken.FromObject(new { Value = property.GetValue(after) })["Value"];
-                            if (before != null && JToken.DeepEquals(value,
-                                JToken.FromObject(new { Value = property.GetValue(before) })["Value"])) continue;
-                            foreach (var id in members.Where(g => g != after.Id))
+                            var source = API.Instance.Database.Games.Get(GetSharedPageOwner(entry.Key, page));
+                            if (source == null || source.Id == target.Id) continue;
+                            foreach (var field in EditionPageCopy.GetFields(page))
                             {
-                                if (!targets.TryGetValue(id, out var target))
-                                {
-                                    var saved = API.Instance.Database.Games.Get(id);
-                                    if (saved == null) continue;
-                                    targets[id] = target = saved.GetCopy();
-                                }
-                                property.SetValue(target, value.Type == JTokenType.Null ? null : value.ToObject(property.PropertyType));
+                                var property = typeof(Game).GetProperty(field);
+                                var value = JToken.FromObject(new { Value = property.GetValue(source) })["Value"];
+                                if (JToken.DeepEquals(value, JToken.FromObject(new { Value = property.GetValue(target) })["Value"])) continue;
+                                property.SetValue(target, value.Type == JTokenType.Null ? null : value.ToObject(property.PropertyType)); changed = true;
                             }
                         }
+                        if (changed) API.Instance.Database.Games.Update(target);
                     }
-                    foreach (var target in targets.Values) API.Instance.Database.Games.Update(target);
                 }
                 finally { synchronisingSharedPages = false; }
             }
         }
-
-        // Trophies uses one real catalogue for linked editions. Its global icon
-        // cache is URL-addressed, so snapshots contain no edition-relative paths.
         private static void CopySharedPageResources(Guid source, Guid target, string page)
         {
             if (source == target || page != "Trophies") return;
@@ -203,17 +231,17 @@ namespace OsirisTheme
             else File.Move(temp, destination);
         }
 
+
         private static void DetachSharedPagesForRemoval(GameEditionProfile profile, Guid id)
         {
-            foreach (var page in profile.SharedPages.ToList())
-            {
-                var group = SharedGroup(profile, id, page.Key);
-                if (group == null) continue;
-                if (group[0] == id && group.Count > 1)
-                    CopySharedPageResources(id, group.First(g => g != id), page.Key);
-                group.Remove(id);
-                page.Value.RemoveAll(g => g.Count < 2);
-            }
+            EnsureMirrors(profile);
+            foreach (var entry in profile.PageMirrors.ToList())
+                foreach (var page in entry.Value.Where(p => p.Value == id).ToList())
+                {
+                    CopySharedPageResources(GetSharedPageOwner(entry.Key, page.Key), entry.Key, page.Key);
+                    entry.Value.Remove(page.Key);
+                }
+            profile.PageMirrors.Remove(id);
         }
     }
 }

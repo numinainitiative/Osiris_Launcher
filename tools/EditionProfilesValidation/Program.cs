@@ -161,6 +161,8 @@ static class Program
         ValidatePageCopy();
         ValidatePageSharing();
         ValidateEditorDrafts();
+        ValidateEditionControls();
+        ValidateLegacyRemoval(settings);
         ValidateBackgroundMetadataQueue();
         ValidateMarkup(args[2]);
         Console.WriteLine("PASS " + checks + " independent edition profile checks; isolated mock database and sandbox files only.");
@@ -283,21 +285,21 @@ static class Program
             "Filling sharing preview leaves saved graph and native record untouched (Cancel)");
         Call("CommitPageSharing", local.Id, new Dictionary<string, Guid?> { ["Advanced"] = source.Id });
         API.Instance.Database.Games.Update(draft);
-        Check((bool)Call("IsPageShared", source.Id, "Advanced") && (Guid)Call("GetSharedPageOwner", local.Id, "Advanced") == source.Id,
-            "Sharing applies to both members, with source as owner");
+        Check(!(bool)Call("IsPageShared", source.Id, "Advanced") && (bool)Call("IsPageShared", local.Id, "Advanced") && (Guid)Call("GetSharedPageOwner", local.Id, "Advanced") == source.Id,
+            "Only the dependent edition is mirrored, with the selected source as owner");
         Check(games[local.Id].Playtime == 1800 && games[local.Id].PlayCount == 4, "Selected source supplies initial shared Advanced values");
         var edit = games[local.Id].GetCopy(); edit.Playtime = 2400; edit.PlayCount = 5;
         API.Instance.Database.Games.Update(edit);
-        Check(games[source.Id].Playtime == 2400 && games[source.Id].PlayCount == 5,
-            "Actual SDK update event propagates playtime/count from local member");
+        Check(games[source.Id].Playtime == 1800 && games[source.Id].PlayCount == 4 && games[local.Id].Playtime == 1800,
+            "Native target updates cannot write back into the mirror source");
         Check(games[source.Id].PluginId == source.PluginId && games[local.Id].PluginId == Guid.Empty && games[source.Id].GameId == "remote-id",
             "Sharing never changes native profile/integration identities");
         Check(string.IsNullOrEmpty(games[local.Id].Description) && games[third.Id].Playtime == 0,
             "Other pages and unlinked third edition remain independent");
-        edit = games[source.Id].GetCopy(); edit.Notes = "Updated from original";
+        edit = games[source.Id].GetCopy(); edit.Notes = "Updated from original"; edit.Playtime = 2400; edit.PlayCount = 5;
         API.Instance.Database.Games.Update(edit);
         Check(games[local.Id].Notes == edit.Notes && games[local.Id].Playtime == 2400,
-            "Bidirectional updates change only modified shared fields");
+            "Source updates flow into the mirrored edition");
         Call("SetPageSharing", third.Id, "Advanced", local.Id);
         Call("SynchronizeSharedPageFields", null, games[local.Id]);
         Check(games[third.Id].Playtime == 2400 && (Guid)Call("GetSharedPageOwner", third.Id, "Advanced") == source.Id,
@@ -306,8 +308,8 @@ static class Program
         Check((bool)Call("IsPageShared", third.Id, "Advanced"), "Sharing graph survives document reload");
         Call("SetPageSharing", local.Id, "Advanced", null);
         edit = games[source.Id].GetCopy(); edit.Playtime = 3000; API.Instance.Database.Games.Update(edit);
-        Check(games[local.Id].Playtime == 2400 && games[third.Id].Playtime == 3000,
-            "Stop sharing retains independent copy and leaves other links intact");
+        Check(games[local.Id].Playtime == 2400 && games[third.Id].Playtime == 2400,
+            "Disabling a mirror keeps a copy; dependents continue following their selected edition");
         var foreign = new Game { Id = Guid.NewGuid(), Name = "Unrelated game" }; games[foreign.Id] = foreign;
         var rejected = false;
         try { Call("SetPageSharing", local.Id, "Advanced", foreign.Id); } catch (TargetInvocationException) { rejected = true; }
@@ -338,12 +340,15 @@ static class Program
         Check(File.Exists(Path.Combine(catalogues, local.Id + ".json")) &&
             (Guid)Call("GetSharedPageOwner", third.Id, "Trophies") == local.Id,
             "Deleting shared canonical member transfers catalogue to survivor");
-        Check(games[third.Id].Playtime == 3000, "Deleting original preserves shared Advanced values");
+        Check(games[third.Id].Playtime == 2400, "Deleting original preserves independent Advanced values");
         var markup = System.Xml.Linq.XDocument.Load(Path.Combine("Development/Contents and Stuff/Development (AI)/Development/ThemeSource", "Views", "MainWindow.xaml"));
         var ns = System.Xml.Linq.XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml");
-        var share = markup.Descendants().Single(e => (string)e.Attribute(ns + "Name") == "PART_OsirisGameEditShareEditionPage");
-        Check((string)share.Attribute("Style") == "{StaticResource OsirisGameEditActionButtonStyle}" && (string)share.Attribute("Height") == "38",
-            "Share page reuses canonical Copy page geometry/style");
+        var toggle = markup.Descendants().Single(e => (string)e.Attribute(ns + "Name") == "PART_OsirisGameEditMirrorEnabled");
+        var sourceBox = markup.Descendants().Single(e => (string)e.Attribute(ns + "Name") == "PART_OsirisGameEditMirrorSource");
+        Check((string)toggle.Attribute("Style") == "{StaticResource OsirisGameEditCheckBoxStyle}" && (string)sourceBox.Attribute("Style") == "{StaticResource OsirisGameEditComboBoxStyle}",
+            "Page mirror reuses canonical switch and dropdown styles");
+        Check(!markup.Descendants().Any(e => (string)e.Attribute(ns + "Name") == "PART_OsirisGameEditEditions" || (string)e.Attribute(ns + "Name") == "PART_OsirisGameEditShareEditionPage"),
+            "Obsolete General editions field and Share page button removed");
     }
 
     public sealed class DraftNativeModel
@@ -453,6 +458,93 @@ static class Program
         Check(!(bool)invoke("SaveEditionSession",new object[0]) && games[premium.Id].Name=="Premium draft","Invalid inactive edition blocks all saves before committing another draft");
         Check(((Game)get("game")).Id==standard.Id && title.Text==" ","Invalid draft is restored for correction");
         invoke("DiscardEditionSession",new object[0]);
+    }
+
+    static void ValidateEditionControls()
+    {
+        games.Clear();
+        var original = new Game { Id=Guid.NewGuid(), Name="Edition controls", PluginId=Guid.NewGuid(), Description="Original overview", Playtime=999, Notes="Original notes" };
+        games[original.Id]=original;
+        var added=Call("CreateNamedEdition",original.Id,"Premium");
+        var addedId=(Guid)added.GetType().GetProperty("EditionId").GetValue(added);
+        var premium=(Game)Call("GetEditionProfile",original.Id,addedId);
+        Check(premium != null && premium.IsCustomGame && premium.Playtime==0 && string.IsNullOrEmpty(premium.Description) && premium.GameActions==null,
+            "Add Edition creates an empty independent local profile without inheriting metadata/actions/time");
+        Check(games[original.Id].Description=="Original overview" && games[original.Id].PluginId==original.PluginId,
+            "Adding an edition preserves the existing profile and integration");
+        var rejected=false;try { Call("CreateNamedEdition",original.Id,"premium"); } catch(TargetInvocationException) { rejected=true; }
+        Check(rejected && games.Count==2,"Duplicate edition names rejected without extra profiles");
+        Call("SwitchEdition",original.Id,addedId);
+        Check((Guid)Call("ResolveEditionForRemoval",original.Id)==premium.Id,"Grid/list stale grouping key resolves deletion to the selected physical edition");
+        var gridTargets=((IEnumerable)Call("ResolveEditionRemovalTargets",new[]{original,premium},true)).Cast<Game>().ToList();
+        var editorTargets=((IEnumerable)Call("ResolveEditionRemovalTargets",new[]{original},false)).Cast<Game>().ToList();
+        Check(gridTargets.Count==1 && gridTargets[0].Id==premium.Id && editorTargets.Count==1 && editorTargets[0].Id==original.Id,
+            "Actual removal target resolver deduplicates grouped grid entries and preserves explicit edit-menu selection");
+        Call("SetPageSharing",premium.Id,"Advanced",original.Id);
+        rejected=false;try { Call("SetPageSharing",original.Id,"Advanced",premium.Id); } catch(TargetInvocationException) { rejected=true; }
+        Check(rejected && !(bool)Call("IsPageShared",original.Id,"Advanced"),"Mirror cycles rejected without changing the source");
+        rejected=false;
+        try { Call("ValidateMirrorDrafts",new Dictionary<Guid,Dictionary<string,Guid?>> {
+            [original.Id]=new Dictionary<string,Guid?> { ["General"]=premium.Id },
+            [premium.Id]=new Dictionary<string,Guid?> { ["General"]=original.Id } }); }
+        catch(TargetInvocationException) { rejected=true; }
+        Check(rejected && !(bool)Call("IsPageShared",original.Id,"General") && !(bool)Call("IsPageShared",premium.Id,"General"),"Unsaved mirror cycles across editions are rejected before any save");
+        Call("SetPageSharing",premium.Id,"Advanced",null);
+        var type=theme.GetType("OsirisTheme.GameEditPageController+GameEditPageState",true);
+        var flags=BindingFlags.Instance|BindingFlags.NonPublic|BindingFlags.Public;
+        var root=new System.Windows.Controls.Grid();NameScope.SetNameScope(root,new NameScope());
+        var panel=new System.Windows.Controls.Grid();root.Children.Add(panel);
+        var toggle=new System.Windows.Controls.CheckBox {Name="PART_OsirisGameEditMirrorEnabled"};root.RegisterName(toggle.Name,toggle);root.Children.Add(toggle);
+        var sourceBox=new System.Windows.Controls.ComboBox {Name="PART_OsirisGameEditMirrorSource"};root.RegisterName(sourceBox.Name,sourceBox);root.Children.Add(sourceBox);
+        var advanced=new System.Windows.Controls.Button {Name="PART_OsirisGameEditAdvanced",Padding=new Thickness(36,0,8,0),Content=new System.Windows.Controls.TextBlock {Text="Advanced"}};
+        var state=Activator.CreateInstance(type,flags,null,new object[]{root},null);
+        Action<string,object> set=(name,value)=>type.GetField(name,flags).SetValue(state,value);
+        Func<string,object> get=name=>type.GetField(name,flags).GetValue(state);
+        Action<string> run=name=>type.GetMethod(name,flags).Invoke(state,new object[0]);
+        var resetStats=new System.Windows.Controls.Button();set("resetStatsButton",resetStats);
+        set("game",premium);set("stagedGame",premium.GetCopy());set("activeEditionId",addedId);set("selectedPageButton",advanced);
+        ((IDictionary)get("pages")).Add(advanced,panel);
+        foreach(var choice in ((IEnumerable)Call("GetEditions",premium.Id))) ((IList)get("editionChoices")).Add(choice);
+        run("InitializeEditionControls");run("UpdateMirrorControls");
+        Check(toggle.IsChecked==false && panel.IsEnabled && !sourceBox.IsEnabled,"Mirror starts disabled with independent editable page");
+        toggle.IsChecked=true;
+        Check(!panel.IsEnabled && sourceBox.IsEnabled && !resetStats.IsEnabled && ((Game)get("stagedGame")).Notes=="Original notes", "Enabling mirror fills from source, makes page read-only and disables indirect target stats reset");
+        Check(!(bool)Call("IsPageShared",premium.Id,"Advanced") && ((IDictionary)get("pendingPageSharing")).Contains("Advanced"),"Mirror switch stages its choice until Save");
+        var badges=(IDictionary)get("mirrorBadges");var badge=(System.Windows.Controls.Viewbox)badges[advanced];
+        var paths=((System.Windows.Controls.Canvas)badge.Child).Children.Cast<System.Windows.Shapes.Path>().ToList();
+        Check(badge.Visibility==Visibility.Visible && paths.Count==2 && ((System.Windows.Media.SolidColorBrush)paths[0].Stroke).Color.G==205,"Provided two-path link vector is displayed in green on mirrored navigation item");
+        toggle.IsChecked=false;
+        Check(panel.IsEnabled && resetStats.IsEnabled && badge.Visibility==Visibility.Collapsed && !sourceBox.IsEnabled && ((Game)get("stagedGame")).Notes=="Original notes", "Turning mirror off keeps copied values, unlocks editing and hides indicator");
+        Call("SetPageSharing",original.Id,"Advanced",premium.Id);
+        run("UpdateMirrorControls");
+        Check(sourceBox.Items.Count==0 && !toggle.IsEnabled,"Source dropdown excludes editions that would create a mirror cycle");
+        run("DisposeEditionControls");
+        Check(advanced.Content is System.Windows.Controls.TextBlock,"Disposing restores original navigation content without duplicate icons");
+        // Cancel a freshly created edition removes only that provisional profile.
+        var provisional=Call("CreateNamedEdition",original.Id,"Provisional");
+        var provisionalId=(Guid)provisional.GetType().GetProperty("EditionId").GetValue(provisional);
+        ((ICollection<Guid>)get("createdSessionEditions")).Add(provisionalId);
+        type.GetMethod("OnRootIsVisibleChanged",flags).Invoke(state,new object[]{root,new DependencyPropertyChangedEventArgs(UIElement.IsVisibleProperty,true,false)});
+        Check(!games.ContainsKey(provisionalId) && games.ContainsKey(original.Id) && games.ContainsKey(premium.Id),"Leaving Edit cancels only the unsaved new edition, preserving existing editions");
+    }
+
+    static void ValidateLegacyRemoval(string settings)
+    {
+        games.Clear();
+        var originalId=Guid.NewGuid();var first=Guid.NewGuid();var selected=Guid.NewGuid();var plugin=Guid.NewGuid();
+        games[originalId]=new Game {Id=originalId,Name="Legacy deletion",PluginId=plugin,GameId="native",Description="Keep original"};
+        File.WriteAllText(Path.Combine(settings,"GameEditions.json"),JsonConvert.SerializeObject(new {
+            SchemaVersion=3,Profiles=new[] {new {GameId=originalId,ActiveEditionId=selected,Editions=new[] {
+                new {EditionId=first,Label="Standard",IsDefault=true,Pages=new {}},
+                new {EditionId=selected,Label="Premium",IsDefault=false,Pages=new {}}
+            }}}
+        }));
+        editions.GetField("document",Flags).SetValue(null,null);
+        Check((Guid)Call("ResolveEditionForRemoval",originalId)==selected && games.Count==2,
+            "Legacy grid deletion first creates independent records and resolves only selected edition");
+        Call("RemoveProfile",selected);games.Remove(selected);
+        Check(games.ContainsKey(originalId) && games[originalId].PluginId==plugin && games[originalId].Description=="Keep original" && ((IEnumerable)Call("GetEditions",originalId)).Cast<object>().Count()==1,
+            "Deleting selected legacy edition preserves original profile and grouping after conversion");
     }
 
     static void ValidateBackgroundMetadataQueue()

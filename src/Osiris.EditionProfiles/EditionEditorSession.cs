@@ -30,6 +30,7 @@ namespace OsirisTheme
                 internal object TrophiesTag;
                 internal string[] TemporaryFiles;
                 internal bool Invalid;
+                internal Dictionary<string, Guid?> MirrorChanges;
             }
 
             private static readonly string[] EditionDraftFields = {
@@ -64,7 +65,8 @@ namespace OsirisTheme
                     TrophiesContent = trophies?.Content, TrophiesTag = trophies?.Tag,
                     TemporaryFiles = temporaryLogoPaths.Concat(temporaryIconPaths).Concat(addedLocalGalleryPaths)
                         .Concat(coverGallery?.TemporaryPaths ?? Enumerable.Empty<string>()).Concat(heroGallery?.TemporaryPaths ?? Enumerable.Empty<string>()).Distinct().ToArray(),
-                    Invalid = fields.HasValidationErrors || string.IsNullOrWhiteSpace(stagedGame?.Name)
+                    Invalid = fields.HasValidationErrors || string.IsNullOrWhiteSpace(stagedGame?.Name),
+                    MirrorChanges = new Dictionary<string, Guid?>(pendingPageSharing)
                 };
             }
 
@@ -115,6 +117,11 @@ namespace OsirisTheme
                     API.Instance.Dialogs.ShowErrorMessage("Please correct the invalid fields in this edition before saving.", "Invalid game data");
                     return false;
                 }
+                foreach (var draft in editionDrafts.Values)
+                    foreach (var change in draft.MirrorChanges.Where(c => c.Value.HasValue && API.Instance.Database.Games.Get(c.Value.Value) == null).ToList())
+                        draft.MirrorChanges[change.Key] = null;
+                try { GameEditions.ValidateMirrorDrafts(editionDrafts.Values.ToDictionary(d => d.Id, d => d.MirrorChanges)); }
+                catch (Exception error) { editionDrafts.Remove(current.Id); API.Instance.Dialogs.ShowErrorMessage(error.Message, "Invalid page mirror"); return false; }
                 foreach (var draft in editionDrafts.Values.OrderBy(d => d.Id == current.Id ? 1 : 0).ToList())
                 {
                     if (API.Instance.Database.Games.Get(draft.Id) == null) { ReleaseEditionDraft(draft); editionDrafts.Remove(draft.Id); continue; }
@@ -123,6 +130,7 @@ namespace OsirisTheme
                     if (!SaveFields()) { editionDrafts.Remove(draft.Id); return false; }
                     editionDrafts.Remove(draft.Id);
                 }
+                createdSessionEditions.Clear();
                 return true;
             }
 
@@ -137,6 +145,17 @@ namespace OsirisTheme
             {
                 foreach (var draft in editionDrafts.Values) ReleaseEditionDraft(draft);
                 editionDrafts.Clear();
+                foreach (var id in createdSessionEditions.ToList())
+                {
+                    var added = API.Instance?.Database?.Games?.Get(id);
+                    if (added == null || added.IsRunning) continue;
+                    var editions = GameEditions.GetEditions(id);
+                    var choice = editions.FirstOrDefault(e => GameEditions.GetEditionProfile(id, e.EditionId)?.Id == id);
+                    if (editions.Count > 1 && choice != null)
+                        GameEditions.RemoveEdition(id, choice.EditionId, editions.First(e => e.EditionId != choice.EditionId).EditionId);
+                    else { GameEditions.RemoveProfile(id); API.Instance.Database.Games.Remove(added); }
+                }
+                createdSessionEditions.Clear();
             }
         }
     }
