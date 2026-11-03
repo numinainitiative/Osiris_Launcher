@@ -30,7 +30,10 @@ ordinary Remove Game command can remove that final profile separately.
 
 General no longer contains an Editions field. The bottom panel contains Add
 Edition, the edition selector, Delete edition immediately after it, and Copy
-page. The footer wraps naturally and reserves space for Save/Cancel. Add Edition
+page. All controls share one 86px-high footer row spanning the full width under
+the navigation panel. The edition/mirror controls scroll horizontally only when
+needed; an Auto-width actions column reserves the actual Save/Cancel/metadata
+button width and prevents overlap. Add Edition
 prompts for a unique name, creates an otherwise-empty local profile (base game
 name retained) and selects it without losing the previous edition's draft.
 Unsaved new editions are removed on Cancel or navigation away. Saving commits
@@ -248,3 +251,5 @@ Data, settings, libraries and extension packages are preserved. No mouse movemen
 or screenshots were used; visual acceptance is left to the user.
 
 Both installations restarted through their root wrappers with correct original Data paths and no core startup errors. Development was then closed; personal was left running for acceptance testing. Personal Trophies 0.1.1 was preserved; this hotfix requires no extension update.
+
+Development footer alignment correction: the previous two-row wrapping layout was replaced with a full-width single horizontal row. XAML parses, named controls/styles are preserved, and the previous runtime XAML is checksum-backed up at `Data/Recovery/ManualFixes/edition-footer-single-row-20261103-175724`. Only Development MainWindow XAML changed; personal/runtime DLLs/data are untouched.
