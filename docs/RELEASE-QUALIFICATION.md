@@ -17,8 +17,12 @@ qualification run.
 Trophies 0.1.2 source `411864c` and catalog `02097ac` are published. Extension
 package SHA-256 `0e7e8ea1de4d0dc9177d6eefa84b1d74d6921e49b96e0dae5448ada0a0531e27`,
 59,374 bytes. Both uploaded asset digests/sizes were validated before promotion;
-twelve catalog artifact records validate. Osiris publication verification follows
-below when complete.
+twelve catalog artifact records validate. Osiris Beta 0.0.56 is published as latest, source `5f38847`. Exactly two assets;
+uploaded size/digests match the qualified files. The archive uploaded in 50s and
+the manifest in under 1s. Anonymous latest endpoint, manifest and a byte-for-byte
+archive prefix were verified. This is not a completed full anonymous ZIP download
+hash claim. Trophies' complete anonymous package download was SHA-256 verified,
+and the public catalog exposes 0.1.2.
 
 Beta 0.0.55 qualification passed on 2 November 2026. Candidate SHA-256:
 `322c628c948195f022f5d1bbfb9fec8b02f4502e4fdeff81ef7c5d2a113e5723`.
