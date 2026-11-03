@@ -160,6 +160,7 @@ static class Program
         ValidateLegacy(settings);
         ValidatePageCopy();
         ValidatePageSharing();
+        ValidateEditorDrafts();
         ValidateBackgroundMetadataQueue();
         ValidateMarkup(args[2]);
         Console.WriteLine("PASS " + checks + " independent edition profile checks; isolated mock database and sandbox files only.");
@@ -343,6 +344,115 @@ static class Program
         var share = markup.Descendants().Single(e => (string)e.Attribute(ns + "Name") == "PART_OsirisGameEditShareEditionPage");
         Check((string)share.Attribute("Style") == "{StaticResource OsirisGameEditActionButtonStyle}" && (string)share.Attribute("Height") == "38",
             "Share page reuses canonical Copy page geometry/style");
+    }
+
+    public sealed class DraftNativeModel
+    {
+        public Game EditingGame { get; set; }
+        public List<Guid> SelectedGenreIds { get; set; } = new List<Guid>();
+        public bool Closed, Saved;
+        public void CloseView(bool first, bool second) { Closed = true; }
+        public void ConfirmDialog(bool close)
+        {
+            EditingGame.GenreIds = SelectedGenreIds.ToList();
+            API.Instance.Database.Games.Update(EditingGame.GetCopy()); Saved = true; Closed = true;
+        }
+    }
+    public sealed class DraftTrophyView : System.Windows.Controls.UserControl
+    {
+        public Guid SavedId;
+        public System.Windows.Controls.TextBox Input = new System.Windows.Controls.TextBox();
+        public DraftTrophyView() { Content = Input; }
+        public void SaveForOsiris(Guid id) { SavedId = id; }
+    }
+    static void ValidateEditorDrafts()
+    {
+        games.Clear();
+        var standard = new Game { Id = Guid.NewGuid(), Name = "Standard saved", PluginId = Guid.NewGuid(), GameId = "native-id" };
+        games[standard.Id] = standard;
+        Call("ApplySelection", standard.Id, new[] { "Standard", "Premium" });
+        var premium = games.Values.Single(g => g.Id != standard.Id);
+        var type = theme.GetType("OsirisTheme.GameEditPageController+GameEditPageState", true);
+        var instanceFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+        var root = new System.Windows.Controls.Grid(); NameScope.SetNameScope(root, new NameScope());
+        var page = new System.Windows.Controls.StackPanel(); root.Children.Add(page);
+        var title = new System.Windows.Controls.TextBox { Name = "PART_OsirisGameEditName" }; page.Children.Add(title); root.RegisterName(title.Name, title);
+        title.SetBinding(System.Windows.Controls.TextBox.TextProperty, new System.Windows.Data.Binding("EditingGame.Name") {
+            Mode = System.Windows.Data.BindingMode.TwoWay, UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus });
+        var enabled = new System.Windows.Controls.CheckBox { Name = "PART_OsirisGameEditStatsInsightsEnabled" }; page.Children.Add(enabled); root.RegisterName(enabled.Name,enabled);
+        var trophies = new System.Windows.Controls.ContentControl { Name = "PART_OsirisGameEditTrophiesHost" }; page.Children.Add(trophies); root.RegisterName(trophies.Name,trophies);
+        var selector = new System.Windows.Controls.ComboBox { Name = "PART_OsirisGameEditEdition" }; root.Children.Add(selector); root.RegisterName(selector.Name,selector);
+        var general = new System.Windows.Controls.Button { Name = "PART_OsirisGameEditGeneral" };
+        var state = Activator.CreateInstance(type, instanceFlags, null, new object[] { root }, null);
+        Action<string, object> set = (name,value) => type.GetField(name,instanceFlags).SetValue(state,value);
+        Func<string, object> get = name => type.GetField(name,instanceFlags).GetValue(state);
+        Func<string, object[], object> invoke = (name,arguments) => type.GetMethod(name,instanceFlags).Invoke(state,arguments);
+        set("generalButton",general); set("nameTextBox", title); set("editionComboBox",selector);
+        ((IDictionary)get("pages")).Add(general,page);
+        var choices = ((IEnumerable)Call("GetEditions",standard.Id)).Cast<object>().ToList(); selector.ItemsSource=choices;
+        var labels = (IList)get("stagedEditionLabels"); labels.Add("Standard"); labels.Add("Premium");
+        var cache = (IDictionary)get("editionDrafts");
+        DraftNativeModel activeModel = null;
+        Action<Game,string,bool> activate = (saved,name,toggle) => {
+            activeModel = new DraftNativeModel { EditingGame=saved.GetCopy(), SelectedGenreIds=new List<Guid> { Guid.NewGuid() } };
+            activeModel.EditingGame.Description=name+" overview";
+            activeModel.EditingGame.Notes=name+" notes"; activeModel.EditingGame.Playtime=(ulong)(toggle ? 120 : 240);
+            activeModel.EditingGame.GameActions = new System.Collections.ObjectModel.ObservableCollection<GameAction> { new GameAction { Name=name+" action", Path=name+".exe" } };
+            set("game",saved);set("stagedGame",activeModel.EditingGame);set("nativeEditModel",activeModel);set("nativeEditModelClosed",false);set("activeEditionId",saved.Id);
+            page.DataContext=activeModel; title.SetCurrentValue(System.Windows.Controls.TextBox.TextProperty,name);
+            enabled.IsChecked=toggle;enabled.Tag=saved.Id;
+            var view=new DraftTrophyView();view.Input.Text=name+" unsaved catalogue";trophies.Content=view;trophies.Tag=saved.Id;
+        };
+        activate(standard,"Standard draft",true); var standardModel=activeModel; var standardTrophies=trophies.Content;
+        Check(standardModel.EditingGame.Name=="Standard saved", "Lost-focus name edit initially remains in control");
+        var first=invoke("CaptureEditionDraft",new object[0]);cache.Add(standard.Id,first);
+        Check(standardModel.EditingGame.Name=="Standard draft", "Switch capture flushes focused text binding into the native draft");
+        var temp=Path.Combine(sandbox,"draft-owned-image.tmp");File.WriteAllText(temp,"temporary draft fixture");
+        var owned=(ICollection<string>)get("temporaryLogoPaths");owned.Add(temp);
+        invoke("SuspendEditionDraft",new object[0]);
+        Check(!standardModel.Closed && File.Exists(temp), "Suspending does not cancel the native model or delete pending media");
+        activate(premium,"Premium draft",false);var premiumModel=activeModel;var premiumTrophies=trophies.Content;
+        var pending=(IDictionary)get("pendingPageSharing");pending.Add("Scripts",standard.Id);
+        Call("SwitchEdition",standard.Id,premium.Id);
+        Action<Guid> switchTo = id => {
+            selector.SelectedItem=choices.Single(c=>(Guid)c.GetType().GetProperty("EditionId").GetValue(c)==id);
+            invoke("OnEditionChanged",new object[] { selector, new System.Windows.Controls.SelectionChangedEventArgs(System.Windows.Controls.Primitives.Selector.SelectionChangedEvent,new object[0],new object[0]) });
+        };
+        switchTo(standard.Id);
+        Check(((IDictionary)get("pendingPageSharing")).Count==0 && !(bool)Call("IsPageShared",premium.Id,"Scripts"),"Pending sharing remains per-edition and is not committed by switching");
+        Check(title.Text=="Standard draft" && ReferenceEquals(get("nativeEditModel"),standardModel),"Actual edition-switch handler restores Standard text and original native model");
+        Check(ReferenceEquals(trophies.Content,standardTrophies) && ((DraftTrophyView)trophies.Content).Input.Text.Contains("Standard draft"),"Trophies unimported text and staged editor instance survive switching");
+        Check(enabled.IsChecked==true && Equals(enabled.Tag,standard.Id),"Per-edition extension control value and save identity restored");
+        Check(((Game)get("stagedGame")).Playtime==120 && ((Game)get("stagedGame")).GameActions[0].Path=="Standard draft.exe","Advanced and Actions drafts survive edition switch");
+        Check(games[standard.Id].Name=="Standard saved" && games[premium.Id].Name!="Premium draft", "Edition switching does not auto-save either game");
+        title.SetCurrentValue(System.Windows.Controls.TextBox.TextProperty,"Standard edited twice");
+        switchTo(premium.Id);
+        Check(title.Text=="Premium draft" && ReferenceEquals(get("nativeEditModel"),premiumModel),"Premium draft survives round trip independently");
+        Check(((IDictionary)get("pendingPageSharing")).Contains("Scripts"),"Unsaved sharing choice returns with its edition");
+        ((IDictionary)get("pendingPageSharing")).Clear();
+        Check(enabled.IsChecked==false && ReferenceEquals(trophies.Content,premiumTrophies),"Premium extension editor and setting remain distinct");
+        switchTo(standard.Id);Check(title.Text=="Standard edited twice","Repeated switches retain newer Standard edits");
+        switchTo(premium.Id);
+        Check((bool)invoke("SaveEditionSession",new object[0]),"Single Save commits the complete multi-edition session");
+        Check(games[standard.Id].Name=="Standard edited twice" && games[premium.Id].Name=="Premium draft","Single Save persists both edition titles");
+        Check(games[standard.Id].GenreIds.SequenceEqual(standardModel.SelectedGenreIds) && games[premium.Id].GenreIds.SequenceEqual(premiumModel.SelectedGenreIds),"Native metadata selector models retain separate selections through Save");
+        Check(games[standard.Id].Playtime==120 && games[premium.Id].Playtime==240,"Saved Advanced data stays per edition");
+        Check(games[standard.Id].Description=="Standard draft overview" && games[premium.Id].Description=="Premium draft overview","Saved General descriptions remain distinct after multiple switches");
+        Check(((DraftTrophyView)standardTrophies).SavedId==standard.Id && ((DraftTrophyView)premiumTrophies).SavedId==premium.Id,"Trophies draft saves target the correct profile");
+        Check(standardModel.Saved && premiumModel.Saved && cache.Count==0,"Every native model saved and session cache released");
+        // Cancel releases cached native models and only owned draft files.
+        activate(games[standard.Id],"Cancelled Standard",true);var cancelled=activeModel;
+        owned.Add(temp);var cancelDraft=invoke("CaptureEditionDraft",new object[0]);cache.Add(standard.Id,cancelDraft);
+        invoke("SuspendEditionDraft",new object[0]);activate(games[premium.Id],"Cancelled Premium",false);
+        invoke("DiscardEditionSession",new object[0]);
+        Check(cancelled.Closed && !cancelled.Saved && !File.Exists(temp),"Cancel closes suspended native draft and removes only pending temporary media");
+        Check(games[standard.Id].Name=="Standard edited twice" && games[premium.Id].Name=="Premium draft","Cancel leaves persisted edition data intact");
+        // Invalid drafts are selected before any edition is committed.
+        var freshSaved=games[standard.Id];activate(freshSaved," ",true);cache.Add(standard.Id,invoke("CaptureEditionDraft",new object[0]));
+        invoke("SuspendEditionDraft",new object[0]);activate(games[premium.Id],"Should not save yet",false);
+        Check(!(bool)invoke("SaveEditionSession",new object[0]) && games[premium.Id].Name=="Premium draft","Invalid inactive edition blocks all saves before committing another draft");
+        Check(((Game)get("game")).Id==standard.Id && title.Text==" ","Invalid draft is restored for correction");
+        invoke("DiscardEditionSession",new object[0]);
     }
 
     static void ValidateBackgroundMetadataQueue()

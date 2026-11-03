@@ -56,7 +56,7 @@ footer. It currently supports General, Advanced, Actions, Links, Scripts and
 Trophies. Other pages retain their independent file/settings ownership. Sharing
 is opt-in for each page and each group of editions; creating an edition never
 links anything automatically. Choose an edition to fill the current draft and
-stage a link, then Save. Cancel or switching editions discards pending links.
+stage a link, then Save. Cancel discards pending links; switching editions now retains them in each edition's draft.
 Linked pages show **Shared page**. **Stop sharing (keep a copy)** separates only
 this edition; other linked editions stay linked.
 
@@ -153,3 +153,43 @@ Visual acceptance is left to the user; no mouse interaction or screenshots were
 used for verification.
 
 Optional shared pages are qualified for Beta 0.0.56 with Trophies 0.1.2; clean startup and the real 0.0.55 upgrade passed.
+
+## Edition editor draft hotfix (3 November 2026)
+
+Switching editions in Game Edit keeps a separate in-memory draft for every
+visited physical game profile. The native editor model is suspended rather than
+closed, preserving its metadata selectors and derived values. Focused text
+bindings are flushed before switching. Reopening an edition restores its current
+text, settings, actions/scripts/links, artwork selection and temporary file
+ownership, gallery add/remove lists, HLTB/Exophase selections, screenshots row
+removals, Stats toggle, Trophies editor instance and pending sharing choices.
+Group edition-label selections follow the entire editing session.
+
+Save validates all drafts, then commits every visited edition through the
+existing native and extension save pipelines. Invalid drafts are restored for
+correction before any edition is committed. The existing per-store save behavior
+is retained; this does not add an all-store disk transaction. Cancel/navigation
+releases all suspended native models and only session-owned temporary media;
+original screenshots/gallery files are not removed until Save. Switching does
+not auto-save. Old size-calculation callbacks are invalidated across switches.
+
+Authoritative additions: `EditorDraftSnapshot.cs`, `EditionEditorSession.cs`.
+The latter extends the existing GameEditPageController partial class; the legacy
+Screenshots editor exposes a memory-only draft capture/restore operation. Native
+models, editor controls and staged file ownership are never serialized into live
+Data. 101 isolated profile/draft/sharing checks pass (including the real switch
+handler, two native-model fixtures, focused bindings, repeated round trips,
+single Save for both editions, independent metadata selectors/General/Advanced,
+Trophies target IDs, pending sharing, Cancel cleanup and invalid-draft preflight),
+plus 65 Details and 72 Collection checks.
+
+The user explicitly authorized this hotfix on Development and the personal
+installation. Both were closed before replacing only the three matching theme
+DLLs. Each installation has a checksum-verified backup under
+`Data/Recovery/ManualFixes/edition-editor-drafts-20261103-151832`.
+Installed SHA-256: `7028d37633763c89430882d121176649585991a154d47057b22091dc93473b18`.
+Version remains Beta 0.0.56; no new public release is published by this hotfix.
+Data, settings, libraries and extension packages are preserved. No mouse movement
+or screenshots were used; visual acceptance is left to the user.
+
+Both installations restarted through their root wrappers with correct original Data paths and no core startup errors. Development was then closed; personal was left running for acceptance testing. Personal Trophies 0.1.1 was preserved; this hotfix requires no extension update.
