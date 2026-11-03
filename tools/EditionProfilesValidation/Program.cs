@@ -58,6 +58,7 @@ static class Program
                     value = Path.Combine(sandbox, "files", call.Args[0].ToString());
                     Directory.CreateDirectory((string)value);
                 }
+                if (call.MethodName == "GetFullFilePath") value = Path.Combine(sandbox,"files",(string)call.Args[0]);
                 if (call.MethodName == "get_IsOpen") value = true;
                 if (call.MethodName == "get_ExtensionsDataPath") value = Path.Combine(sandbox, "extensions-data");
                 if (type.IsInterface && value == null)
@@ -163,6 +164,7 @@ static class Program
         ValidateEditorDrafts();
         ValidateEditionControls();
         ValidateLegacyRemoval(settings);
+        ValidateAllPageMirrors(args.Length > 4 ? args[4] : null);
         ValidateBackgroundMetadataQueue();
         ValidateMarkup(args[2]);
         Console.WriteLine("PASS " + checks + " independent edition profile checks; isolated mock database and sandbox files only.");
@@ -290,8 +292,8 @@ static class Program
         Check(games[local.Id].Playtime == 1800 && games[local.Id].PlayCount == 4, "Selected source supplies initial shared Advanced values");
         var edit = games[local.Id].GetCopy(); edit.Playtime = 2400; edit.PlayCount = 5;
         API.Instance.Database.Games.Update(edit);
-        Check(games[source.Id].Playtime == 1800 && games[source.Id].PlayCount == 4 && games[local.Id].Playtime == 1800,
-            "Native target updates cannot write back into the mirror source");
+        Check(games[source.Id].Playtime == 2400 && games[source.Id].PlayCount == 5 && games[local.Id].Playtime == 2400,
+            "Played time/count from either physical edition contribute to shared Advanced counters");
         Check(games[source.Id].PluginId == source.PluginId && games[local.Id].PluginId == Guid.Empty && games[source.Id].GameId == "remote-id",
             "Sharing never changes native profile/integration identities");
         Check(string.IsNullOrEmpty(games[local.Id].Description) && games[third.Id].Playtime == 0,
@@ -504,8 +506,11 @@ static class Program
         var resetStats=new System.Windows.Controls.Button();set("resetStatsButton",resetStats);
         set("game",premium);set("stagedGame",premium.GetCopy());set("activeEditionId",addedId);set("selectedPageButton",advanced);
         ((IDictionary)get("pages")).Add(advanced,panel);
+        var danger=new System.Windows.Controls.Button {Name="PART_OsirisGameEditDangerZone",Content="Danger Zone"};
+        ((IDictionary)get("pages")).Add(danger,new System.Windows.Controls.Grid());
         foreach(var choice in ((IEnumerable)Call("GetEditions",premium.Id))) ((IList)get("editionChoices")).Add(choice);
         run("InitializeEditionControls");run("UpdateMirrorControls");
+        Check(Equals(danger.Content,"Danger Zone") && !((IDictionary)get("mirrorBadges")).Contains(danger),"Danger Zone retains its string-template label and never receives a link wrapper");
         Check(toggle.IsChecked==false && panel.IsEnabled && !sourceBox.IsEnabled,"Mirror starts disabled with independent editable page");
         toggle.IsChecked=true;
         Check(!panel.IsEnabled && sourceBox.IsEnabled && !resetStats.IsEnabled && ((Game)get("stagedGame")).Notes=="Original notes", "Enabling mirror fills from source, makes page read-only and disables indirect target stats reset");
@@ -545,6 +550,78 @@ static class Program
         Call("RemoveProfile",selected);games.Remove(selected);
         Check(games.ContainsKey(originalId) && games[originalId].PluginId==plugin && games[originalId].Description=="Keep original" && ((IEnumerable)Call("GetEditions",originalId)).Cast<object>().Count()==1,
             "Deleting selected legacy edition preserves original profile and grouping after conversion");
+    }
+
+    static void ValidateAllPageMirrors(string extensionStage)
+    {
+        games.Clear();
+        var source=new Game {Id=Guid.NewGuid(),Name="Shared page source",PluginId=Guid.NewGuid(),GameId="source-id",Playtime=900};
+        games[source.Id]=source;Call("ApplySelection",source.Id,new[]{"Standard","Premium"});
+        var target=games.Values.Single(g=>g.Id!=source.Id);target.GameId="target-id";target.InstallDirectory="own-install";
+        var pages=new[]{"General","Advanced","Media","Links","Actions","Scripts","Gallery","Screenshots","StatsInsights","Trophies","HowLongToBeat","Exophase"};
+        Check(pages.All(page=>(bool)Call("CanSharePage",page)) && !(bool)Call("CanSharePage","Installation") && !(bool)Call("CanSharePage","DangerZone"),
+            "Every requested page supports mirroring except unique Installation and Danger Zone");
+        var from=API.Instance.Database.GetFileStoragePath(source.Id);var to=API.Instance.Database.GetFileStoragePath(target.Id);
+        File.WriteAllText(Path.Combine(from,"Icon.png"),"source artwork fixture");
+        source.Icon=Path.Combine(source.Id.ToString(),"Icon.png");API.Instance.Database.Games.Update(source);
+        Call("SetPageSharing",target.Id,"Media",source.Id);Call("SynchronizeSharedPageFields",null,source);
+        Check(games[target.Id].Icon==source.Icon && (Guid)Call("GetStorageId",target.Id,"Media")==source.Id,"Media shares source artwork and role/rotation storage");
+        Call("SetPageSharing",target.Id,"Media",null);
+        Check(games[target.Id].Icon.StartsWith(target.Id.ToString()) && File.ReadAllText(Path.Combine(to,"Icon.png"))=="source artwork fixture" && File.Exists(Path.Combine(from,"Icon.png")),
+            "Unlinking Media clones owned artwork and rebases references without removing source assets");
+        File.WriteAllText(Path.Combine(from,"OsirisStatsInsights.ini"),"Enabled=False");
+        File.WriteAllText(Path.Combine(to,"OsirisStatsInsights.ini"),"Enabled=True");
+        Call("SetPageSharing",target.Id,"StatsInsights",source.Id);
+        Check((Guid)Call("GetStorageId",target.Id,"StatsInsights")==source.Id,"Stats Insights has a scoped settings owner");
+        Directory.CreateDirectory(Path.Combine(from,"Screenshots"));File.WriteAllText(Path.Combine(from,"Screenshots","fixture.png"),"synthetic fixture, not a screen capture");
+        File.WriteAllText(Path.Combine(from,"OsirisScreenshotsGallery.ini"),"Enabled=False");
+        Call("SetPageSharing",target.Id,"Screenshots",source.Id);
+        Check((Guid)Call("GetStorageId",target.Id,"Screenshots")==source.Id,"Screenshots resolves the selected page owner");
+        Call("SetPageSharing",target.Id,"Screenshots",null);
+        Check(File.Exists(Path.Combine(to,"Screenshots","fixture.png")) && File.Exists(Path.Combine(from,"Screenshots","fixture.png")),"Screenshots unlink keeps an independent snapshot without deleting originals");
+        File.WriteAllText(Path.Combine(from,"GalleryImage1.png"),"gallery image");File.WriteAllText(Path.Combine(from,"Trailer1.mp4"),"gallery trailer");
+        Call("SetPageSharing",target.Id,"Gallery",source.Id);Call("SetPageSharing",target.Id,"Gallery",null);
+        Check(File.Exists(Path.Combine(to,"GalleryImage1.png")) && File.Exists(Path.Combine(to,"Trailer1.mp4")),"Gallery unlink preserves artwork, trailers and settings in target storage");
+        Call("SetPageSharing",target.Id,"Advanced",source.Id);Call("SynchronizeSharedPageFields",null,source);
+        Check(games[target.Id].Playtime==900 && games[target.Id].Id==target.Id && games[target.Id].PluginId==Guid.Empty && games[target.Id].GameId=="target-id" && games[target.Id].InstallDirectory=="own-install",
+            "Advanced shares played time while database ID, native game ID, library ownership and Installation remain unique");
+        if (string.IsNullOrEmpty(extensionStage)) return;
+        var staged=JArray.Parse(File.ReadAllText(Path.Combine(extensionStage,"manifest.json")));
+        var flags=BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance|BindingFlags.Static;
+        foreach(var page in new[]{"HowLongToBeat","Exophase"})
+        {
+            var assembly=Assembly.LoadFrom((string)staged.Single(e=>(string)e["Page"]==page)["Staged"]);
+            var type=assembly.GetTypes().Single(t=>t.Name==(page=="HowLongToBeat"?"CompletionTimeGameSettingsStore":"ExophaseGameSettingsStore"));
+            var settingsType=assembly.GetTypes().Single(t=>t.Name==(page=="HowLongToBeat"?"CompletionTimeGameSettings":"ExophaseGameSettings"));
+            var id=page=="HowLongToBeat"?"fba3e63d-d1a1-4b9d-91c6-091a1220377d":"26131977-669a-4ef7-a66c-026122a24089";
+            var folder=Path.Combine(sandbox,"extensions-data","Extras",page+"_"+id);
+            var store=Activator.CreateInstance(type,flags,null,new object[]{folder},null);
+            var value=Activator.CreateInstance(settingsType,true);settingsType.GetProperty("Enabled").SetValue(value,false);
+            type.GetMethod("Save",flags).Invoke(store,new object[]{source.Id,value});
+            Call("SetPageSharing",target.Id,page,source.Id);
+            var loaded=type.GetMethod("Load",flags).Invoke(store,new object[]{target.Id});
+            Check(!(bool)settingsType.GetProperty("Enabled").GetValue(loaded),page+" installed compatibility adapter reads source settings without changing native identity");
+            Call("SetPageSharing",target.Id,page,null);
+            var reopened=Activator.CreateInstance(type,flags,null,new object[]{folder},null);
+            loaded=type.GetMethod("Load",flags).Invoke(reopened,new object[]{target.Id});
+            Check(!(bool)settingsType.GetProperty("Enabled").GetValue(loaded),page+" unlink materializes its own cached-settings snapshot");
+        }
+        var shots=Assembly.LoadFrom((string)staged.Single(e=>(string)e["Page"]=="Screenshots")["Staged"]);
+        var collector=shots.GetTypes().Single(t=>t.Name=="ScreenshotCollector");
+        Call("SetPageSharing",target.Id,"Screenshots",source.Id);
+        var folderPath=(string)collector.GetMethod("GameFolder",flags).Invoke(null,new object[]{sandbox,target.Id});
+        Check(folderPath==Path.Combine(sandbox,"library","files",source.Id.ToString("D"),"Screenshots"),"Screenshot capture adapter stores a launched target's captures in its explicitly linked screenshot page");
+        Call("SetPageSharing",target.Id,"Screenshots",null);
+        folderPath=(string)collector.GetMethod("GameFolder",flags).Invoke(null,new object[]{sandbox,target.Id});
+        Check(folderPath.Contains(target.Id.ToString("D")),"Disabling screenshot mirror restores per-edition capture destination");
+        var stats=Assembly.LoadFrom((string)staged.Single(e=>(string)e["Page"]=="StatsInsights")["Staged"]);
+        var providerType=stats.GetTypes().Single(t=>t.Name=="StatsInsightsProvider");
+        var constructor=providerType.GetConstructors(flags).Single();
+        var constructorArgs=new object[constructor.GetParameters().Length];constructorArgs[0]=API.Instance;
+        var provider=constructor.Invoke(constructorArgs);
+        Check(!(bool)providerType.GetMethod("Enabled",flags).Invoke(provider,new object[]{games[target.Id]}),"Installed Stats adapter respects linked enablement without linking its session ledger/database IDs");
+        Call("SetPageSharing",target.Id,"StatsInsights",null);
+        Check(File.ReadAllText(Path.Combine(to,"OsirisStatsInsights.ini")).Contains("False"),"Unlinked Stats page retains an independent settings copy");
     }
 
     static void ValidateBackgroundMetadataQueue()

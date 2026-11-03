@@ -68,6 +68,7 @@ namespace OsirisTheme
             private FrameworkElement mirrorControls;
             private System.Windows.Controls.Primitives.ButtonBase deleteEditionButton;
             private bool updatingMirrorControls;
+            private readonly Dictionary<string, Guid> pendingMirrorCopies = new Dictionary<string, Guid>();
             private readonly Dictionary<System.Windows.Controls.Primitives.ButtonBase, FrameworkElement> mirrorBadges =
                 new Dictionary<System.Windows.Controls.Primitives.ButtonBase, FrameworkElement>();
             private readonly HashSet<Guid> createdSessionEditions = new HashSet<Guid>();
@@ -83,7 +84,7 @@ namespace OsirisTheme
                 if (deleteEditionButton != null) deleteEditionButton.Click += OnDeleteEditionClick;
                 foreach (var button in pages.Keys)
                 {
-                    if (mirrorBadges.ContainsKey(button)) continue;
+                    if (mirrorBadges.ContainsKey(button) || (button as FrameworkElement)?.Name == "PART_OsirisGameEditDangerZone") continue;
                     var label = button.Content;
                     button.Content = null;
                     var grid = new Grid { ClipToBounds = false };
@@ -188,6 +189,7 @@ namespace OsirisTheme
                     var previousSource = EffectiveMirrorSource(CurrentCopyPage());
                     if (CurrentCopyPage() == "Trophies") TrophiesGameEditor.Load(root, game.Id,
                         GameEditions.GetSharedPageOwner(previousSource ?? game.Id, "Trophies"));
+                    if (previousSource.HasValue) pendingMirrorCopies[CurrentCopyPage()] = GameEditions.GetSharedPageOwner(previousSource.Value, CurrentCopyPage());
                     pendingPageSharing[CurrentCopyPage()] = null;
                     UpdateMirrorControls();
                 }
@@ -212,8 +214,14 @@ namespace OsirisTheme
                         next = GameEditions.GetPageMirrorSource(next.Value, page);
                     }
                     var owner = API.Instance.Database.Games.Get(GameEditions.GetSharedPageOwner(source.Id, page));
-                    if (page == "Trophies") TrophiesGameEditor.Load(root, game.Id, owner.Id);
-                    else CopyEditionPage(owner.GetCopy(), page);
+                    switch (page)
+                    {
+                        case "Trophies": TrophiesGameEditor.Load(root, game.Id, owner.Id); break;
+                        case "Gallery": DiscardLocalGalleryChanges(); LoadGallerySettings(owner.Id); break;
+                        case "Screenshots": ScreenshotsGameEditor.LoadFromStorage(root, game.Id, API.Instance.Database.GetFileStoragePath(owner.Id)); break;
+                        default: CopyEditionPage(owner.GetCopy(), page); break;
+                    }
+                    pendingMirrorCopies[page] = owner.Id;
                     pendingPageSharing[page] = source.Id;
                 }
                 catch (Exception error) { API.Instance.Dialogs.ShowErrorMessage(error.Message, "Unable to mirror page"); }

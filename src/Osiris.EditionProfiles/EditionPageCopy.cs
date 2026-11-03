@@ -15,6 +15,7 @@ namespace OsirisTheme
             ["General"] = new[] { "Name", "SortingName", "PlatformIds", "GenreIds", "DeveloperIds", "PublisherIds",
                 "FeatureIds", "TagIds", "AgeRatingIds", "SeriesIds", "ReleaseDate", "SourceId", "Version", "Description" },
             ["Advanced"] = new[] { "LastActivity", "Playtime", "PlayCount", "CompletionStatusId", "Added", "Favorite", "Hidden", "Notes" },
+            ["Media"] = new[] { "Icon", "CoverImage", "BackgroundImage" },
             ["Links"] = new[] { "Links" },
             ["Actions"] = new[] { "GameActions", "IncludeLibraryPluginAction" },
             ["Scripts"] = new[] { "PreScript", "PostScript", "GameStartedScript", "UseGlobalPreScript", "UseGlobalPostScript", "UseGlobalGameStartedScript" },

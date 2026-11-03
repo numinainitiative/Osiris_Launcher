@@ -13,11 +13,13 @@ namespace OsirisTheme
     public static class EditionPageSharing
     {
         public static Guid ResolveOwner(Guid gameId, string page) => GameEditions.GetSharedPageOwner(gameId, page);
+        public static Game ResolveGame(Game game, string page) => game == null ? null :
+            API.Instance?.Database?.Games?.Get(ResolveOwner(game.Id, page)) ?? game;
     }
     internal static partial class GameEditions
     {
         private static bool sharingEventsAttached, synchronisingSharedPages;
-        private static readonly string[] ShareablePages = { "General", "Advanced", "Actions", "Links", "Scripts", "Trophies" };
+        private static readonly string[] ShareablePages = { "General", "Advanced", "Media", "Actions", "Links", "Scripts", "Gallery", "Screenshots", "StatsInsights", "HowLongToBeat", "Exophase", "Trophies" };
         internal static bool CanSharePage(string page) => ShareablePages.Contains(page, StringComparer.Ordinal);
         internal static void InitializePageSharing()
         {
@@ -53,6 +55,8 @@ namespace OsirisTheme
                     }
                 }
             profile.SharedPages.Clear();
+            foreach (var pages in profile.PageMirrors.Values)
+                foreach (var page in pages.Keys.Where(p => !CanSharePage(p)).ToList()) pages.Remove(page);
         }
         internal static Guid? GetPageMirrorSource(Guid id, string page)
         {
@@ -78,6 +82,15 @@ namespace OsirisTheme
             }
         }
         internal static bool IsPageShared(Guid id, string page) => GetPageMirrorSource(id, page).HasValue;
+        internal static Guid[] GetPageDependents(Guid source, string page)
+        {
+            lock (SyncRoot)
+            {
+                var profile = GetProfile(source);
+                return profile == null ? new Guid[0] : profile.Editions.Select(e => e.GameProfileId)
+                    .Where(id => id != source && GetSharedPageOwner(id, page) == source).ToArray();
+            }
+        }
         internal static void ValidateMirrorDrafts(IDictionary<Guid, Dictionary<string, Guid?>> drafts)
         {
             lock (SyncRoot)
@@ -167,9 +180,11 @@ namespace OsirisTheme
                 }
             }
             RaiseChanged();
+            if (sourceId.HasValue && page == "Advanced")
+                SynchronizeSharedPageFields(null, API.Instance.Database.Games.Get(sourceId.Value));
         }
-        // Resolve every dependent against the authoritative source. A native
-        // update on a mirrored target must never write back into its source.
+        // Resolve every dependent against its source. Only positive native
+        // activity deltas contribute back; other dependent fields stay read-only.
         internal static void SynchronizeSharedPageFields(Game before, Game after)
         {
             if (after == null) return;
@@ -181,6 +196,22 @@ namespace OsirisTheme
                 synchronisingSharedPages = true;
                 try
                 {
+                    // Native session counters still originate on the physical
+                    // edition being played. Contribute its positive activity
+                    // delta to the shared Advanced source, without merging IDs
+                    // or giving a dependent editor write access to other fields.
+                    if (before != null && GetPageMirrorSource(after.Id, "Advanced").HasValue)
+                    {
+                        var owner = API.Instance.Database.Games.Get(GetSharedPageOwner(after.Id, "Advanced"))?.GetCopy();
+                        if (owner != null && owner.Id != after.Id)
+                        {
+                            var activityChanged = false;
+                            if (after.Playtime > before.Playtime) { owner.Playtime += Math.Min(ulong.MaxValue - owner.Playtime, after.Playtime - before.Playtime); activityChanged = true; }
+                            if (after.PlayCount > before.PlayCount) { owner.PlayCount += Math.Min(ulong.MaxValue - owner.PlayCount, after.PlayCount - before.PlayCount); activityChanged = true; }
+                            if (after.LastActivity.HasValue && (!owner.LastActivity.HasValue || after.LastActivity > owner.LastActivity)) { owner.LastActivity = after.LastActivity; activityChanged = true; }
+                            if (activityChanged) API.Instance.Database.Games.Update(owner);
+                        }
+                    }
                     foreach (var entry in profile.PageMirrors.ToList())
                     {
                         var saved = API.Instance.Database.Games.Get(entry.Key);
@@ -206,7 +237,8 @@ namespace OsirisTheme
         }
         private static void CopySharedPageResources(Guid source, Guid target, string page)
         {
-            if (source == target || page != "Trophies") return;
+            if (source == target) return;
+            if (page != "Trophies") { CopyMirrorPageResources(source, target, page); return; }
             var root = API.Instance?.Paths?.ExtensionsDataPath;
             if (string.IsNullOrEmpty(root)) throw new InvalidOperationException("Extension storage is unavailable.");
             root = Path.Combine(root, "72ba1fc9-490b-4fa4-96f0-0a154b56c1db", "catalogues");

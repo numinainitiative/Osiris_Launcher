@@ -35,7 +35,7 @@ namespace OsirisTheme
 
             private static readonly string[] EditionDraftFields = {
                 "game", "stagedGame", "nativeEditModel", "nativeEditModelClosed", "nativeEditModelError", "isNewGame", "activeEditionId",
-                "pendingPageSharing", "stagedEditionLabels", "mediaLoaded", "stagedArchiveSizeBytes",
+                "pendingPageSharing", "pendingMirrorCopies", "stagedEditionLabels", "mediaLoaded", "stagedArchiveSizeBytes",
                 "originalLogoPaths", "stagedLogoPaths", "temporaryLogoPaths", "originalIconPaths", "stagedIconPaths", "temporaryIconPaths",
                 "selectedLogoIndex", "originalSelectedLogoIndex", "selectedIconIndex", "originalSelectedIconIndex",
                 "addedLocalGalleryPaths", "removedLocalGalleryPaths", "localGalleryItems",
