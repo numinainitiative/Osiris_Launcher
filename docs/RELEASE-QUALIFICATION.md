@@ -1,5 +1,22 @@
 # Release qualification
 
+Beta 0.0.58 is published as latest, source `8f37f4b`. Exactly two assets were
+uploaded draft-first and verified against local sizes and GitHub SHA-256 digests
+before promotion. A full anonymous application download, public manifest and
+archive prefix all match the qualified candidate. Gallery 2.0.7, Screenshots
+Gallery 0.1.4 and Exophase 0.2.10 (source `0ddb00c`) are published, and their
+complete anonymous downloads match local checksums. Catalog `0f79fa3` verifies
+all twelve artifacts and exposes the three versions through its immutable public
+URL; raw main was still serving the previous cached versions immediately after
+publication.
+Development is reopened through its root wrapper with the persistent Data path.
+All three new extension versions loaded and normal imports completed without
+new core fatal/unhandled/plugin-load failures. Release metadata/footer and the
+three manifests were backed up under Data/Recovery/ManualFixes/
+`release-0.0.58-20261104-185937` before updating. Packaged extension modules match
+the already tested Development modules byte-for-byte. The new retention updater
+is installed there. Personal program files were not changed.
+
 Beta 0.0.58 qualification passed on 4 November 2026. Candidate SHA-256:
 `3a2fb271d9b327d2975d1bc821ac7bcb4fe32880ae293d41bba328deae4dc52d`
 (441,008,726 bytes). Clean startup loaded all twelve extension fixtures,
