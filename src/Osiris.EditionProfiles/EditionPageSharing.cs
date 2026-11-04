@@ -13,8 +13,18 @@ namespace OsirisTheme
     public static class EditionPageSharing
     {
         public static Guid ResolveOwner(Guid gameId, string page) => GameEditions.GetSharedPageOwner(gameId, page);
-        public static Game ResolveGame(Game game, string page) => game == null ? null :
-            API.Instance?.Database?.Games?.Get(ResolveOwner(game.Id, page)) ?? game;
+        public static Game ResolveGame(Game game, string page) => page == "ExophaseActivity" ? ResolveActivityGame(game, "Exophase") :
+            game == null ? null : API.Instance?.Database?.Games?.Get(ResolveOwner(game.Id, page)) ?? game;
+        public static Game ResolveActivityGame(Game game, string page)
+        {
+            var source = ResolveGame(game, page);
+            if (game == null || source == null || game.Id == source.Id) return game;
+            // Match the shared Exophase catalogue by its source title while
+            // retaining this edition's native playtime and library baseline.
+            var projection = game.GetCopy();
+            projection.Name = source.Name;
+            return projection;
+        }
     }
     internal static partial class GameEditions
     {

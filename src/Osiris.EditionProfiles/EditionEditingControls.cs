@@ -148,7 +148,9 @@ namespace OsirisTheme
                         mirrorSource.ItemsSource = choices;
                         mirrorSource.SelectedItem = choices.FirstOrDefault(e => GameEditions.GetEditionProfile(game.Id, e.EditionId)?.Id == source) ??
                             choices.FirstOrDefault(e => e.EditionId == previous?.EditionId) ?? choices.FirstOrDefault();
-                        mirrorSource.IsEnabled = supported && source.HasValue && choices.Count > 0;
+                        // Let the user choose the source before enabling the
+                        // switch; selecting it alone never changes the page.
+                        mirrorSource.IsEnabled = supported && choices.Count > 0;
                     }
                     if (mirrorEnabled != null) { mirrorEnabled.IsEnabled = supported && (validSourceCount > 0 || source.HasValue); mirrorEnabled.IsChecked = source.HasValue; }
                     if (copyEditionPageButton != null) copyEditionPageButton.IsEnabled = !source.HasValue && editionChoices.Count > 1;

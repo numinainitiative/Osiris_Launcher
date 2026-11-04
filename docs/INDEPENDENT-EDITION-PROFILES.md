@@ -329,3 +329,47 @@ The Extensions repository records baseline provenance/hashes, bridge source and
 reproducible package transformation. No live extension installation is a build
 input; unrelated paused source changes remain excluded. All 138 release mirror
 checks and clean/0.0.56-upgrade/rollback qualification passed on 4 November 2026.
+
+## Development Game Details mirror fixes (4 November 2026)
+
+The edition popup uses its full padded host width, a -13px shell-alignment
+position, and hidden vertical/disabled horizontal scrollbars. Mouse-wheel scroll
+remains available for long lists. The source dropdown in Game Edit is selectable
+before enabling a mirror, including Advanced; selection alone does not stage a
+link. The normal switch, read-only target page, independent IDs and Save/Cancel
+rules remain.
+
+Game Gallery now resolves its delayed LoadControlData argument as well as its
+context, avoiding a source/target mismatch that discarded successful loads and
+left Loading gallery visible. Screenshots keeps the physical view context ID;
+folder and enablement calls resolve the live mirror on each refresh, so linking
+or unlinking does not leave the card attached to a stale source ID.
+
+Hero Exophase time bindings now use EditionPlaytimePresentation, separate from
+the Exophase card's page source. Its lookup follows Advanced's ultimate owner;
+unlinked editions use their own time, linked editions use their chosen source,
+and unavailable Exophase falls back to that owner's native time. Exophase's
+activity resolver uses the shared catalogue title while retaining physical native
+baseline and identity. The existing helper ResolveGame API accepts the optional
+ExophaseActivity projection key; no new helper API or helper DLL deployment is
+required, including when another extension has already loaded the old helper.
+
+155 isolated tests pass, including actual Gallery/Screenshots WPF controls with
+synthetic local data, source switching/unlinking, real Exophase baseline resolution,
+Advanced native/imported selection, popup sizing against an unshown selector,
+and WPF hero-child ordering. 64 Details layout and 27 responsive checks pass.
+An initial startup caught a child-before-Grid.RowDefinitions XAML ordering error;
+it was corrected and covered by a WPF loader regression. The final root-wrapper
+startup/import completed with no new fatal/unhandled/plugin-load failures.
+
+Deployment is Development only: three matching theme DLLs, TopPanel and
+DetailsViewGameOverview templates, and Gallery/Screenshots/Exophase DLLs. Eight
+original files are hash-backed up under Data/Recovery/ManualFixes/
+`details-edition-mirrors-20261104-135515`. Theme SHA-256:
+`6bd69d40895cd8efe7e0e093aa25eeaa0fea804f0e47e2532df9612886d5ed7c`.
+Adapters are generated from pinned public baselines, not dirty extension source;
+HLTB, Stats, Trophies and the public bridge helper are unchanged. Staging manifest:
+`Programming/Sandbox/DetailsMirrorFix-20261104-135138/manifest.json`.
+No personal installation or public release was changed. Before the next release,
+assign new Gallery/Screenshots/Exophase versions and package these corrected
+boundaries using the updated guarded adapter, then qualify coordinated packages.

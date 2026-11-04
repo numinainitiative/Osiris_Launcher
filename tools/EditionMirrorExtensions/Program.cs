@@ -31,12 +31,22 @@ foreach (var method in type.Methods.Where(m => m.HasBody).ToList())
             Console.WriteLine(method.FullName);
         continue;
     }
+    if (page == "Screenshots" && method.Name == "GameContextChanged" && method.Body.Instructions.Count >= 4 &&
+        method.Body.Instructions[2].Operand is IMethod oldContext && oldContext.Name == "ResolveGame")
+    {
+        if (verify) throw new InvalidOperationException("Screenshot view still aliases its physical context: " + method.FullName);
+        for (var i = 0; i < 4; i++) method.Body.Instructions.RemoveAt(0);
+        changed++;
+    }
     bool idStore = (page == "HowLongToBeat" && type.Name == "CompletionTimeGameSettingsStore" && new[] { "Load", "Save", "StoreFetchedResult" }.Contains(method.Name.String)) ||
         (page == "Exophase" && type.Name == "ExophaseGameSettingsStore" && new[] { "Load", "Save" }.Contains(method.Name.String)) ||
         (page == "Screenshots" && type.Name == "ScreenshotCollector" && new[] { "GameFolder", "IsEnabled" }.Contains(method.Name.String));
-    var gameContext = method.Name == "GameContextChanged" && new[] { "Gallery", "Screenshots", "HowLongToBeat", "Exophase" }.Contains(page);
+    // Screenshots keeps its physical context ID. Its folder/enablement calls
+    // resolve owners every refresh, including links changed without navigation.
+    var gameContext = method.Name == "GameContextChanged" && new[] { "Gallery", "HowLongToBeat", "Exophase" }.Contains(page);
     var gameResolve = page == "Exophase" && type.Name == "ExophaseActivityResolver" && method.Name == "Resolve" ||
-        page == "HowLongToBeat" && method.Name == "SelectStoredResult";
+        page == "HowLongToBeat" && method.Name == "SelectStoredResult" ||
+        page == "Gallery" && type.Name == "SteamScreenshotsControl" && method.Name == "LoadControlData";
     var parameter = idStore ? method.Parameters.FirstOrDefault(p => p.Type.FullName == "System.Guid") :
         gameContext ? method.Parameters.LastOrDefault(p => p.Type.FullName == "Playnite.SDK.Models.Game") :
         gameResolve ? method.Parameters.FirstOrDefault(p => p.Type.FullName == "Playnite.SDK.Models.Game") : null;
@@ -44,11 +54,20 @@ foreach (var method in type.Methods.Where(m => m.HasBody).ToList())
     {
         boundaries++;
         var resolver = idStore ? resolveId : resolveGame;
+        // Reuse the existing helper API so an older helper already loaded by
+        // another extension remains compatible with this scoped projection.
+        var contextPage = page == "Exophase" && gameResolve ? "ExophaseActivity" : page;
         var exists = method.Body.Instructions.Take(5).Any(i => i.Operand is IMethod m && m.FullName == resolver.FullName);
+        if (exists && method.Body.Instructions[1].OpCode == OpCodes.Ldstr && (string)method.Body.Instructions[1].Operand != contextPage)
+        {
+            if (verify) throw new InvalidOperationException("Wrong owner projection: " + method.FullName);
+            method.Body.Instructions[1].Operand = contextPage;
+            changed++;
+        }
         if (!exists)
         {
             if (verify) throw new InvalidOperationException("Missing owner boundary: " + method.FullName);
-            var code = new[] { Instruction.Create(OpCodes.Ldarg, parameter), Instruction.Create(OpCodes.Ldstr, page),
+            var code = new[] { Instruction.Create(OpCodes.Ldarg, parameter), Instruction.Create(OpCodes.Ldstr, contextPage),
                 Instruction.Create(OpCodes.Call, resolver), Instruction.Create(OpCodes.Starg, parameter) };
             for (var i = 0; i < code.Length; i++) method.Body.Instructions.Insert(i, code[i]);
             method.Body.KeepOldMaxStack = false; changed++;
@@ -83,7 +102,7 @@ foreach (var method in type.Methods.Where(m => m.HasBody).ToList())
     }
 }
 if (inspect) return;
-var minimum = page switch { "HowLongToBeat" => 4, "Exophase" => 4, "Screenshots" => 3, "Gallery" => 2, "StatsInsights" => 1, _ => throw new ArgumentException("Unknown page") };
+var minimum = page switch { "HowLongToBeat" => 4, "Exophase" => 4, "Screenshots" => 2, "Gallery" => 5, "StatsInsights" => 1, _ => throw new ArgumentException("Unknown page") };
 if (boundaries < minimum) throw new InvalidOperationException($"Unsupported {page} extension: found {boundaries}, expected at least {minimum} exact boundaries.");
 if (changed > 0)
 {

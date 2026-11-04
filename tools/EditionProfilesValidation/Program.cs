@@ -60,6 +60,7 @@ static class Program
                 }
                 if (call.MethodName == "GetFullFilePath") value = Path.Combine(sandbox,"files",(string)call.Args[0]);
                 if (call.MethodName == "get_IsOpen") value = true;
+                if (call.MethodName == "get_UIDispatcher") value = Application.Current.Dispatcher;
                 if (call.MethodName == "get_ExtensionsDataPath") value = Path.Combine(sandbox, "extensions-data");
                 if (type.IsInterface && value == null)
                     value = new Proxy(type, call.MethodName == "get_Games" ? "games" : call.MethodName).GetTransparentProxy();
@@ -180,6 +181,7 @@ static class Program
         ValidateEditionControls();
         ValidateLegacyRemoval(settings);
         ValidateAllPageMirrors(args.Length > 4 ? args[4] : null);
+        ValidateDetailsDropdown(args[2]);
         ValidateBackgroundMetadataQueue();
         ValidateMarkup(args[2]);
         Console.WriteLine("PASS " + checks + " independent edition profile checks; isolated mock database and sandbox files only.");
@@ -520,13 +522,15 @@ static class Program
         Action<string> run=name=>type.GetMethod(name,flags).Invoke(state,new object[0]);
         var resetStats=new System.Windows.Controls.Button();set("resetStatsButton",resetStats);
         set("game",premium);set("stagedGame",premium.GetCopy());set("activeEditionId",addedId);set("selectedPageButton",advanced);
+        set("editionHeader",new System.Windows.Controls.Grid());set("editionComboBox",new System.Windows.Controls.ComboBox());
         ((IDictionary)get("pages")).Add(advanced,panel);
         var danger=new System.Windows.Controls.Button {Name="PART_OsirisGameEditDangerZone",Content="Danger Zone"};
         ((IDictionary)get("pages")).Add(danger,new System.Windows.Controls.Grid());
         foreach(var choice in ((IEnumerable)Call("GetEditions",premium.Id))) ((IList)get("editionChoices")).Add(choice);
         run("InitializeEditionControls");run("UpdateMirrorControls");
+        type.GetMethod("Select",flags).Invoke(state,new object[]{advanced});
         Check(Equals(danger.Content,"Danger Zone") && !((IDictionary)get("mirrorBadges")).Contains(danger),"Danger Zone retains its string-template label and never receives a link wrapper");
-        Check(toggle.IsChecked==false && panel.IsEnabled && !sourceBox.IsEnabled,"Mirror starts disabled with independent editable page");
+        Check(toggle.IsChecked==false && panel.IsEnabled && sourceBox.IsEnabled,"Mirror starts independent and source can be chosen before enabling");
         toggle.IsChecked=true;
         Check(!panel.IsEnabled && sourceBox.IsEnabled && !resetStats.IsEnabled && ((Game)get("stagedGame")).Notes=="Original notes", "Enabling mirror fills from source, makes page read-only and disables indirect target stats reset");
         Check(!(bool)Call("IsPageShared",premium.Id,"Advanced") && ((IDictionary)get("pendingPageSharing")).Contains("Advanced"),"Mirror switch stages its choice until Save");
@@ -534,7 +538,7 @@ static class Program
         var paths=((System.Windows.Controls.Canvas)badge.Child).Children.Cast<System.Windows.Shapes.Path>().ToList();
         Check(badge.Visibility==Visibility.Visible && paths.Count==2 && ((System.Windows.Media.SolidColorBrush)paths[0].Stroke).Color.G==205,"Provided two-path link vector is displayed in green on mirrored navigation item");
         toggle.IsChecked=false;
-        Check(panel.IsEnabled && resetStats.IsEnabled && badge.Visibility==Visibility.Collapsed && !sourceBox.IsEnabled && ((Game)get("stagedGame")).Notes=="Original notes", "Turning mirror off keeps copied values, unlocks editing and hides indicator");
+        Check(panel.IsEnabled && resetStats.IsEnabled && badge.Visibility==Visibility.Collapsed && sourceBox.IsEnabled && ((Game)get("stagedGame")).Notes=="Original notes", "Turning mirror off keeps copied values, unlocks editing and allows choosing a new source");
         Call("SetPageSharing",original.Id,"Advanced",premium.Id);
         run("UpdateMirrorControls");
         Check(sourceBox.Items.Count==0 && !toggle.IsEnabled,"Source dropdown excludes editions that would create a mirror cycle");
@@ -637,6 +641,119 @@ static class Program
         Check(!(bool)providerType.GetMethod("Enabled",flags).Invoke(provider,new object[]{games[target.Id]}),"Installed Stats adapter respects linked enablement without linking its session ledger/database IDs");
         Call("SetPageSharing",target.Id,"StatsInsights",null);
         Check(File.ReadAllText(Path.Combine(to,"OsirisStatsInsights.ini")).Contains("False"),"Unlinked Stats page retains an independent settings copy");
+        ValidateDetailsMirrors(source, target, from, staged, flags);
+    }
+
+    static void PumpUntil(Func<bool> done, string label)
+    {
+        var deadline=DateTime.UtcNow.AddSeconds(5);
+        while (!done() && DateTime.UtcNow<deadline)
+        {
+            var frame=new System.Windows.Threading.DispatcherFrame();
+            Application.Current.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
+                new Action(()=>frame.Continue=false));
+            System.Windows.Threading.Dispatcher.PushFrame(frame);
+            System.Threading.Thread.Sleep(10);
+        }
+        Check(done(),label);
+    }
+
+    static void ValidateDetailsDropdown(string themeSource)
+    {
+        var document=new System.Xml.XmlDocument();document.Load(Path.Combine(themeSource,"Views","TopPanel.xaml"));
+        var ns=new System.Xml.XmlNamespaceManager(document.NameTable);
+        ns.AddNamespace("w","http://schemas.microsoft.com/winfx/2006/xaml/presentation");ns.AddNamespace("x","http://schemas.microsoft.com/winfx/2006/xaml");
+        var style=document.SelectSingleNode("//w:Style[@x:Key='OsirisHeaderEditionSelectorComboBoxStyle']",ns);
+        Check(style.SelectSingleNode(".//w:ScrollViewer",ns).Attributes["VerticalScrollBarVisibility"].Value=="Hidden","Edition dropdown hides the scrollbar without disabling mouse-wheel scrolling");
+        var markup="<ResourceDictionary xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' xmlns:osiris='clr-namespace:OsirisTheme;assembly=OsirisTheme'>"+style.OuterXml+"</ResourceDictionary>";
+        var resources=(ResourceDictionary)System.Windows.Markup.XamlReader.Parse(markup);
+        var combo=new System.Windows.Controls.ComboBox {Width=220,Style=(Style)resources["OsirisHeaderEditionSelectorComboBoxStyle"]};
+        var host=new System.Windows.Controls.Border {Padding=new Thickness(12,0,12,0),BorderThickness=new Thickness(1),Child=combo};
+        host.Measure(new Size(246,42));host.Arrange(new Rect(0,0,246,42));combo.ApplyTemplate();host.UpdateLayout();
+        var popup=(System.Windows.Controls.Primitives.Popup)combo.Template.FindName("PART_Popup",combo);
+        var surface=(System.Windows.Controls.Border)popup.Child;
+        PumpUntil(()=>Math.Abs(surface.Width-host.ActualWidth)<0.01,"Actual edition popup width matches the complete selector's outer border");
+        Check(popup.HorizontalOffset==-13 && ReferenceEquals(popup.PlacementTarget,combo),"Edition popup aligns its left edge with the selector's padded outer shell");
+        var hero=new System.Xml.XmlDocument();hero.Load(Path.Combine(themeSource,"Views","DetailsViewGameOverview.xaml"));
+        var timing=hero.SelectSingleNode("//w:Border[@x:Name='PART_OsirisHeroPlayedForStat']/w:Grid",ns);
+        var layoutPrefix=string.Concat(timing.ChildNodes.Cast<System.Xml.XmlNode>().TakeWhile(n=>n.LocalName!="StackPanel").Select(n=>n.OuterXml))
+            .Replace(" xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\"", "");
+        var fixture="<Grid xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' xmlns:osiris='clr-namespace:OsirisTheme;assembly=OsirisTheme'>"+layoutPrefix+"<TextBlock /></Grid>";
+        File.WriteAllText(Path.Combine(sandbox,"hero-time-fixture.xaml"),fixture);
+        Check(System.Windows.Markup.XamlReader.Parse(fixture) is System.Windows.Controls.Grid,"Hero time display loads with WPF property groups before child content");
+        Check(hero.OuterXml.Contains("OsirisEditionPlaytimePresentation") && !hero.SelectSingleNode("//w:Border[@x:Name='PART_OsirisHeroPlayedForStat']",ns).OuterXml.Contains("ElementName=Exophase_ActivityViewControl"),
+            "Hero time presentation follows Advanced independently from the Exophase card");
+    }
+
+    static void ValidateDetailsMirrors(Game source, Game target, string from, JArray staged, BindingFlags flags)
+    {
+        var presentation=theme.GetType("OsirisTheme.EditionPlaytimePresentation",true);
+        Call("SetPageSharing",target.Id,"Advanced",null);
+        games[source.Id].Playtime=3600;games[target.Id].Playtime=7200;
+        var requested=Guid.Empty;
+        Func<Guid,ulong> imported=id=> {requested=id;return id==source.Id?10800UL:14400UL;};
+        Func<Game,Func<Guid,ulong>,ulong> read=(game,provider)=>(ulong)presentation.GetMethod("ReadDisplayedTime",flags).Invoke(null,new object[]{game,provider});
+        Check(read(games[target.Id],null)==7200 && read(games[source.Id],null)==3600,"Unlinked Advanced pages show each physical edition's own native time");
+        Check(read(games[target.Id],imported)==14400 && requested==target.Id,"Independent Advanced uses only its own Exophase total");
+        Call("SetPageSharing",target.Id,"Advanced",source.Id);
+        Check(read(games[target.Id],imported)==10800 && requested==source.Id,"Linked Advanced uses its chosen source's Exophase total");
+        Check(read(games[target.Id],id=>throw new IOException("offline"))==3600,"Unavailable Exophase falls back to the Advanced source's native time");
+        Call("SetPageSharing",target.Id,"Exophase",source.Id);
+        games[target.Id].Playtime=7200;
+        var bridge=theme.GetType("OsirisTheme.EditionPageSharing",true);
+        var projected=(Game)bridge.GetMethod("ResolveActivityGame").Invoke(null,new object[]{games[target.Id],"Exophase"});
+        Check(projected.Id==target.Id && projected.Playtime==7200 && projected.PluginId==target.PluginId && projected.Name==source.Name,
+            "Shared Exophase catalogue name never replaces a physical edition's native baseline or IDs");
+        var exo=Assembly.LoadFrom((string)staged.Single(e=>(string)e["Page"]=="Exophase")["Staged"]);
+        var activity=Activator.CreateInstance(exo.GetTypes().Single(t=>t.Name=="ExophaseActivityStore"),flags,null,new object[]{Path.Combine(sandbox,"activity-fixture")},null);
+        var exoSettings=Activator.CreateInstance(exo.GetTypes().Single(t=>t.Name=="ExophaseGameSettingsStore"),flags,null,new object[]{Path.Combine(sandbox,"activity-settings-fixture")},null);
+        var resolverType=exo.GetTypes().Single(t=>t.Name=="ExophaseActivityResolver");
+        var resolver=Activator.CreateInstance(resolverType,flags,null,new object[]{activity,exoSettings,API.Instance},null);
+        var resolved=resolverType.GetMethod("Resolve",flags).Invoke(resolver,new object[]{games[target.Id],true});
+        Check((ulong)resolved.GetType().GetProperty("TotalPlaytimeSeconds").GetValue(resolved)==7200,"Actual Exophase resolver keeps the edition's own native time with a linked catalogue");
+        Call("SetPageSharing",target.Id,"Advanced",null);
+        Check(read(games[target.Id],imported)==14400 && requested==target.Id,"Unlinking Advanced restores independent time selection even while Exophase remains linked");
+        Call("SetPageSharing",target.Id,"Exophase",null);
+
+        var previousContext=System.Threading.SynchronizationContext.Current;
+        System.Threading.SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext(Application.Current.Dispatcher));
+        var screenshotAssembly=Assembly.LoadFrom((string)staged.Single(e=>(string)e["Page"]=="Screenshots")["Staged"]);
+        var viewType=screenshotAssembly.GetTypes().Single(t=>t.Name=="ScreenshotsViewControl");
+        var folder=Path.Combine(sandbox,"library","files",source.Id.ToString("D"),"Screenshots");Directory.CreateDirectory(folder);
+        var bitmap=System.Windows.Media.Imaging.BitmapSource.Create(1,1,96,96,System.Windows.Media.PixelFormats.Bgra32,null,new byte[]{0,0,255,255},4);
+        var encoder=new System.Windows.Media.Imaging.PngBitmapEncoder();encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+        using(var file=File.Create(Path.Combine(folder,"synthetic.png"))) encoder.Save(file);
+        Call("SetPageSharing",target.Id,"Screenshots",source.Id);
+        var screenshots=Activator.CreateInstance(viewType,new object[]{sandbox,new Func<string>(()=>"Full screen")});
+        viewType.GetMethod("GameContextChanged").Invoke(screenshots,new object[]{null,games[target.Id]});
+        Check((Guid)viewType.GetField("gameId",flags).GetValue(screenshots)==target.Id,"Screenshot view keeps physical context for live link/unlink changes");
+        try { PumpUntil(()=>(bool)viewType.GetProperty("HasScreenshots").GetValue(screenshots),"Actual screenshot card discovers the linked source's synthetic image"); }
+        catch { Console.Error.WriteLine("Screenshot state: loading="+viewType.GetField("loading",flags).GetValue(screenshots)+", files="+((Array)viewType.GetField("files",flags).GetValue(screenshots)).Length+", profile="+sandbox+", owner="+Call("GetSharedPageOwner",target.Id,"Screenshots"));throw; }
+        Call("SetPageSharing",target.Id,"Screenshots",null);
+        viewType.GetMethod("Refresh",flags).Invoke(screenshots,new object[0]);
+        PumpUntil(()=>!(bool)viewType.GetProperty("HasScreenshots").GetValue(screenshots),"Screenshot card stops using the old source after unlink without a context switch");
+
+        var galleryAssembly=Assembly.LoadFrom((string)staged.Single(e=>(string)e["Page"]=="Gallery")["Staged"]);
+        var galleryType=galleryAssembly.GetTypes().Single(t=>t.Name=="SteamScreenshotsControl");
+        var settingsType=galleryAssembly.GetTypes().Single(t=>t.Name=="SteamScreenshotsSettingsViewModel");
+        var settings=System.Runtime.Serialization.FormatterServices.GetUninitializedObject(settingsType);
+        settingsType.GetProperty("Settings").SetValue(settings,Activator.CreateInstance(galleryAssembly.GetTypes().Single(t=>t.Name=="SteamScreenshotsSettings")));
+        var serviceType=galleryAssembly.GetTypes().Single(t=>t.Name=="ScreenshotManagementService");
+        var service=Activator.CreateInstance(serviceType,new object[]{null,null,null,sandbox,sandbox});
+        foreach(var file in Directory.GetFiles(from,"GalleryImage*")) File.Delete(file);
+        foreach(var file in Directory.GetFiles(from,"Trailer*")) File.Delete(file);
+        File.WriteAllText(Path.Combine(from,"OsirisGallery.ini"),"Enabled=True\r\nSource=Local\r\n");
+        Call("SetPageSharing",target.Id,"Gallery",source.Id);
+        var gallery=Activator.CreateInstance(galleryType,new object[]{settings,service});
+        galleryType.GetMethod("GameContextChanged").Invoke(gallery,new object[]{null,games[target.Id]});
+        var task=(System.Threading.Tasks.Task)galleryType.GetMethod("LoadControlData",flags).Invoke(gallery,new object[]{games[target.Id],System.Threading.CancellationToken.None});
+        PumpUntil(()=>task.IsCompleted,"Actual delayed Gallery load completes for a mirrored edition");
+        task.GetAwaiter().GetResult();
+        Check((string)galleryType.GetProperty("GalleryStatusText").GetValue(gallery)=="No gallery content available.","Linked Gallery exits Loading even when its source has no media");
+        galleryType.GetMethod("CancelPendingLoads",flags).Invoke(gallery,new object[0]);
+        galleryType.GetMethod("DisposeLocalMediaWatcher",flags).Invoke(gallery,new object[0]);
+        (service as IDisposable)?.Dispose();
+        System.Threading.SynchronizationContext.SetSynchronizationContext(previousContext);
     }
 
     static void ValidateBackgroundMetadataQueue()
