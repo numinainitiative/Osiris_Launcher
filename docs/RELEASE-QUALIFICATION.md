@@ -1,5 +1,25 @@
 # Release qualification
 
+Beta 0.0.58 qualification passed on 4 November 2026. Candidate SHA-256:
+`3a2fb271d9b327d2975d1bc821ac7bcb4fe32880ae293d41bba328deae4dc52d`
+(441,008,726 bytes). Clean startup loaded all twelve extension fixtures,
+including Gallery 2.0.7, Screenshots Gallery 0.1.4 and Exophase 0.2.10.
+The real 0.0.57 upgrade preserved Data and the installed old Stats files.
+Qualification suffix: `Beta_0.0.58-qualification-20261104-185643`.
+All 155 actual-WPF/profile/mirror/time checks passed against the release package
+modules. Updater integration passed successful upgrade, two-copy retention by
+UTC timestamp, old failed-snapshot cleanup, rollback without pruning, Data and
+unrelated Recovery preservation, and external junction-target preservation.
+Archive privacy/checksums, inherited update/protocol guards, shell branding,
+tracking core/helper and matching three theme DLLs passed. No personal files
+were changed and persistent Development Data was not used for fresh testing.
+
+The three coordinated extensions are rebuilt from pinned public baselines with
+original licenses preserved; paused dirty source changes remain excluded.
+Use Extensions `build/New-EditionMirrorPackages.ps1 -ExtensionName
+Exophase,GameGallery,ScreenshotsGallery`. HLTB 1.2.6, Stats 0.1.5 and Trophies
+0.1.2 remain current. The existing optional bridge API remains unchanged.
+
 Beta 0.0.57 is published as latest, source `e3e9fa6`, with exactly two verified
 assets. Upload sizes and GitHub digests match the qualified files. A complete
 anonymous application ZIP download also matches SHA-256

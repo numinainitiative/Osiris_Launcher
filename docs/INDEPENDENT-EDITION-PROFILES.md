@@ -373,3 +373,12 @@ HLTB, Stats, Trophies and the public bridge helper are unchanged. Staging manife
 No personal installation or public release was changed. Before the next release,
 assign new Gallery/Screenshots/Exophase versions and package these corrected
 boundaries using the updated guarded adapter, then qualify coordinated packages.
+
+## Beta 0.0.58 coordination
+
+The Development fixes above are qualified with Game Gallery 2.0.7, Screenshots
+Gallery 0.1.4 and Exophase 0.2.10. Update Osiris first, then those three
+extensions. The existing bridge helper API, HLTB, Stats and Trophies remain
+unchanged. All 155 checks passed against these packaged modules; clean and real
+0.0.57 upgrade startup passed. Beta 0.0.58 also includes the updater's two-copy
+restore-point retention implementation.

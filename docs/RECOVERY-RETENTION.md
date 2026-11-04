@@ -1,7 +1,7 @@
 # Recovery retention
 
-Implemented on 4 November 2026 and deployed to Development only; not included
-in the already published Beta 0.0.57 assets.
+Implemented on 4 November 2026 and initially deployed to Development only.
+Included in Beta 0.0.58; the already published Beta 0.0.57 assets are unchanged.
 
 After an update is successfully installed, the updater retains its just-created
 restore copy plus the newest other complete copy in `Data/Recovery/Updates`.
