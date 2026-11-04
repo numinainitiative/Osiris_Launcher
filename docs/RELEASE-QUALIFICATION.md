@@ -1,5 +1,22 @@
 # Release qualification
 
+Beta 0.0.57 is published as latest, source `e3e9fa6`, with exactly two verified
+assets. Upload sizes and GitHub digests match the qualified files. A complete
+anonymous application ZIP download also matches SHA-256
+`5360f29f670dbc32fb44d77f29d4165feb34f475ec08e624b190c12c4cc8d191`.
+The public manifest and archive prefix were independently checked. All five
+coordinated extension releases (source `356ec31`) were uploaded draft-first,
+verified, published, and fully anonymously downloaded with matching checksums.
+The 12-entry catalog `909d709` validates all local artifacts; the immutable
+public catalog exposes the five new versions. Raw main was temporarily cached
+at its previous versions during immediate verification.
+Development was backed up under Data/Recovery/ManualFixes/
+`release-0.0.57-20261104-124544`, updated to released program files/extension
+packages and footer version, and reopened through its root wrapper. Sole engine
+uses the persistent Development Data path; all five new plugin versions loaded,
+normal imports completed, no core fatal/unhandled/plugin-load failures. Existing
+Xbox unavailable-title warnings are unchanged. Personal files remain untouched.
+
 Beta 0.0.57 qualification passed on 4 November 2026. Candidate SHA-256:
 `5360f29f670dbc32fb44d77f29d4165feb34f475ec08e624b190c12c4cc8d191`
 (441,004,798 bytes). Clean installation loaded all twelve extensions, including
