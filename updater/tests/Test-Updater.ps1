@@ -143,6 +143,26 @@ $sentinel = Join-Path $installRoot 'Data\preserve-me.txt'
 Set-Content -LiteralPath $sentinel -Value 'user data must survive'
 $sentinelHash = (Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash
 
+# Restore-point ordering uses the timestamp, not version or directory mtime.
+$recovery = Join-Path $installRoot 'Data\Recovery\Updates'
+$seedNames = @('Beta_9.0.0-20200101-000000','Beta_8.0.0-20200102-000000','Beta_0.0.1-20200103-000000')
+foreach ($name in $seedNames) {
+    $copy = Join-Path $recovery $name
+    New-Item -ItemType Directory -Path (Join-Path $copy 'App') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $copy 'Root') -Force | Out-Null
+    '{"version":"fixture"}' | Set-Content -LiteralPath (Join-Path $copy 'Root\version.json')
+    (Get-Item -LiteralPath $copy).LastWriteTimeUtc = [DateTime]::UtcNow.AddDays(10)
+}
+$failedSeed = Join-Path $recovery 'Beta_0.0.2-20200104-000000'
+New-Item -ItemType Directory -Path (Join-Path $failedSeed 'Root') -Force | Out-Null
+'{"version":"failed-fixture"}' | Set-Content -LiteralPath (Join-Path $failedSeed 'Root\version.json')
+$manual = Join-Path $installRoot 'Data\Recovery\ManualFixes\preserve.txt'
+New-Item -ItemType Directory -Path (Split-Path $manual) -Force | Out-Null
+'manual recovery' | Set-Content -LiteralPath $manual
+$unknown = Join-Path $recovery 'user-notes\preserve.txt'
+New-Item -ItemType Directory -Path (Split-Path $unknown) -Force | Out-Null
+'not an updater restore point' | Set-Content -LiteralPath $unknown
+
 $successApi = New-TestRelease -Version 'Beta_1.0.32' -Marker 'updated'
 Invoke-UpdateCheck -InstallRoot $installRoot -ReleaseApi $successApi
 Wait-ForLogText -InstallRoot $installRoot -Text 'Installed Osiris Beta_1.0.32'
@@ -155,6 +175,16 @@ if ((Get-Content -LiteralPath (Join-Path $installRoot 'App\release-marker.txt') 
 if ((Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash -ne $sentinelHash) {
     throw 'Data was modified during a successful update.'
 }
+Wait-ForLogText -InstallRoot $installRoot -Text ('Removed old update backup: ' + $seedNames[0])
+for ($attempt=0; $attempt -lt 100; $attempt++) {
+    if (!(Test-Path -LiteralPath $failedSeed)) { break }
+    Start-Sleep -Milliseconds 100
+}
+$restoreCopies = @(Get-ChildItem -LiteralPath $recovery -Directory | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'Root\version.json') })
+if ($restoreCopies.Count -ne 2 -or !(Test-Path -LiteralPath (Join-Path $recovery $seedNames[2])) -or
+    (Test-Path -LiteralPath (Join-Path $recovery $seedNames[0])) -or (Test-Path -LiteralPath (Join-Path $recovery $seedNames[1])) -or
+    !(Test-Path -LiteralPath $manual) -or !(Test-Path -LiteralPath $unknown)) { throw 'Successful update did not retain the two newest restore copies safely.' }
+$preservedCopies = @($restoreCopies | Select-Object -ExpandProperty FullName)
 
 New-Item -ItemType Directory -Path (Join-Path $installRoot 'blocked.txt') | Out-Null
 $failureApi = New-TestRelease -Version 'Beta_1.0.33' -Marker 'must-rollback' -ForceApplyFailure
@@ -169,8 +199,25 @@ if ((Get-Content -LiteralPath (Join-Path $installRoot 'App\release-marker.txt') 
 if ((Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash -ne $sentinelHash) {
     throw 'Data was modified during rollback.'
 }
+foreach ($copy in $preservedCopies) { if (!(Test-Path -LiteralPath $copy)) { throw 'Failed update pruned an existing restore point.' } }
+
+# An old snapshot containing a junction must never delete its external target.
+$outside = Join-Path $testRoot 'outside-recovery'
+New-Item -ItemType Directory -Path $outside | Out-Null
+'must survive' | Set-Content -LiteralPath (Join-Path $outside 'sentinel.txt')
+$junctionCopy = Join-Path $recovery 'Beta_0.0.0-19990101-000000'
+New-Item -ItemType Directory -Path (Join-Path $junctionCopy 'Root') -Force | Out-Null
+'{"version":"junction-fixture"}' | Set-Content -LiteralPath (Join-Path $junctionCopy 'Root\version.json')
+New-Item -ItemType Junction -Path (Join-Path $junctionCopy 'App') -Target $outside | Out-Null
+$assembly = [Reflection.Assembly]::LoadFile($updater)
+$prune = $assembly.GetType('Osiris.Updater.Program').GetMethod('PruneUpdateBackups',[Reflection.BindingFlags]'Static,NonPublic')
+$prune.Invoke($null,[object[]]@([string]$installRoot,[string]($preservedCopies[0])))
+if (!(Test-Path -LiteralPath (Join-Path $outside 'sentinel.txt')) -or !(Test-Path -LiteralPath $junctionCopy)) { throw 'Cleanup followed or removed a junction snapshot.' }
 
 Write-Output 'Updater integration test passed:'
 Write-Output '  Beta_1.0.31 -> Beta_1.0.32 installed'
 Write-Output '  Data sentinel preserved'
 Write-Output '  forced Beta_1.0.33 failure rolled back to Beta_1.0.32'
+Write-Output '  successful update keeps two newest restore copies, clears old failed snapshots, preserves unrelated Recovery data'
+Write-Output '  failed update preserves existing restore points'
+Write-Output '  junction snapshots skipped without touching their external targets'

@@ -232,6 +232,11 @@ namespace Osiris.Updater
                 return 1;
             }
 
+            // Retention is maintenance after a successful install. A cleanup
+            // failure must never turn a completed update into a rollback.
+            try { PruneUpdateBackups(root, backup); }
+            catch (Exception exception) { WriteLog(root, "Update backup cleanup skipped: " + exception.Message); }
+
             if (!options.NoRestart)
             {
                 Process.Start(new ProcessStartInfo
@@ -244,6 +249,55 @@ namespace Osiris.Updater
             }
 
             return 0;
+        }
+
+        private static void PruneUpdateBackups(string root, string currentBackup)
+        {
+            root = ValidateRoot(root);
+            var backups = Path.Combine(root, "Data", "Recovery", "Updates");
+            if (!Directory.Exists(backups)) return;
+            // Refuse junctions in the parent chain as well as inside snapshots.
+            for (var directory = new DirectoryInfo(backups); directory != null; directory = directory.Parent)
+            {
+                if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
+                    throw new IOException("Recovery path contains a junction: " + directory.FullName);
+                if (string.Equals(directory.FullName.TrimEnd('\\'), root.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) break;
+            }
+            if (!string.IsNullOrEmpty(currentBackup)) EnsureChildPath(backups, currentBackup);
+            var copies = new DirectoryInfo(backups).GetDirectories()
+                .Select(d => new { Directory = d, Stamp = Regex.Match(d.Name, @"^(?:Alpha|Beta|Stable)_\d+\.\d+\.\d+-(\d{8}-\d{6})$") })
+                .Where(d => d.Stamp.Success && File.Exists(Path.Combine(d.Directory.FullName, "Root", "version.json")))
+                .OrderByDescending(d => string.Equals(d.Directory.FullName, currentBackup, StringComparison.OrdinalIgnoreCase))
+                .ThenByDescending(d => d.Stamp.Groups[1].Value, StringComparer.Ordinal)
+                .ToList();
+            var keep = new HashSet<string>(copies
+                .Where(d => Directory.Exists(Path.Combine(d.Directory.FullName, "App")))
+                .Take(2).Select(d => d.Directory.FullName), StringComparer.OrdinalIgnoreCase);
+            foreach (var copy in copies.Where(d => !keep.Contains(d.Directory.FullName)))
+            {
+                try
+                {
+                    EnsureChildPath(backups, copy.Directory.FullName);
+                    AssertNoReparsePoints(copy.Directory.FullName);
+                    Directory.Delete(copy.Directory.FullName, true);
+                    WriteLog(root, "Removed old update backup: " + copy.Directory.Name);
+                }
+                catch (Exception exception) { WriteLog(root, "Could not remove update backup " + copy.Directory.Name + ": " + exception.Message); }
+            }
+        }
+
+        private static void AssertNoReparsePoints(string path)
+        {
+            var pending = new Stack<string>();
+            pending.Push(path);
+            while (pending.Count != 0)
+            {
+                var current = pending.Pop();
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                    throw new IOException("Backup contains a reparse point: " + current);
+                if ((File.GetAttributes(current) & FileAttributes.Directory) != 0)
+                    foreach (var child in Directory.EnumerateFileSystemEntries(current)) pending.Push(child);
+            }
         }
 
         private static void WaitForLauncher(string root)

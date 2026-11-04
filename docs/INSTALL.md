@@ -30,6 +30,12 @@ Osiris creates a writable `Data` folder inside the installation directory. This
 folder contains the user's library, settings, extension data, cache, logs, and
 backups. It is preserved when Osiris is updated.
 
+The updater saves the previous application in `Data/Recovery/Updates` for
+rollback. The next updater build (currently deployed to Development) keeps only
+the two newest complete restore copies after a successful update. Failed
+updates retain existing restore points. Manual hotfix backups and extension
+backups are separate; see [Recovery retention](RECOVERY-RETENTION.md).
+
 ## Windows SmartScreen
 
 Current prerelease packages are not code-signed. Windows may show a SmartScreen
