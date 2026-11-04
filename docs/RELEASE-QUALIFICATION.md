@@ -1,5 +1,28 @@
 # Release qualification
 
+Beta 0.0.57 qualification passed on 4 November 2026. Candidate SHA-256:
+`5360f29f670dbc32fb44d77f29d4165feb34f475ec08e624b190c12c4cc8d191`
+(441,004,798 bytes). Clean installation loaded all twelve extensions, including
+coordinated Game Gallery 2.0.6, Screenshots Gallery 0.1.3, Stats 0.1.5,
+HowLongToBeat 1.2.6 and Exophase 0.2.9. Trophies remains 0.1.2.
+Real 0.0.56 upgrade preserved the Data sentinel and existing Stats program files.
+Forced updater failure/rollback preserved Data. Qualification suffix:
+`Beta_0.0.57-qualification-20261104-124157`. All 138 isolated edition/editor/
+mirror checks pass against the actual release adapters, including absent-host
+fallback, unique identities, shared counters and independent resource snapshots.
+Archive privacy/checksums, branding, matching theme DLLs, tracking helper and
+disabled inherited update channel passed. A first startup attempt refused an
+active Development engine; Development was gracefully closed before the passing
+run. Personal files were not changed.
+
+The five extension packages are reproducible from pinned, checksum-verified
+public baselines through Extensions `build/New-EditionMirrorPackages.ps1`,
+`shared/EditionMirrorBridge`, and the app's guarded `tools/EditionMirrorExtensions`.
+The bridge uses optional host reflection so older hosts retain independent-page
+behaviour. Original licenses are preserved. No installed extension or live Data
+was used as an extension build input. Paused Screenshots/Steam Library changes
+are excluded. Public promotion and download verification are recorded below.
+
 Beta 0.0.56 qualification passed on 3 November 2026. Candidate SHA-256:
 `0eed8cf96cf0a80c0e7b3e1161afa8263e5d0e9532d59136be575aec61f6ec6c`
 (440,967,668 bytes). Clean installation loaded all twelve extension fixtures,

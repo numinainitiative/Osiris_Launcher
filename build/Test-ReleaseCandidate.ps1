@@ -1,5 +1,5 @@
-﻿[CmdletBinding()]
-param([string]$WorkspaceRoot = 'C:\Development\Osiris Launcher', [string]$Version = 'Beta_0.0.56', [string]$PreviousVersion = 'Beta_0.0.55', [string]$CandidateDirectory)
+[CmdletBinding()]
+param([string]$WorkspaceRoot = 'C:\Development\Osiris Launcher', [string]$Version = 'Beta_0.0.57', [string]$PreviousVersion = 'Beta_0.0.56', [string]$CandidateDirectory)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -31,12 +31,12 @@ foreach ($name in @('applogo.ico','applogo_white.ico','applogo_black.ico')) {
 [IO.Compression.ZipFile]::ExtractToDirectory((Join-Path $artifacts "Osiris-$PreviousVersion-win-x64.zip"), $upgradeRoot)
 $extensions = @(
     @('FunGames','0.3.2','FunGames_9ac287c1-0c9c-4453-b668-9857c4e7d7e6','Extras','Fun Games'),
-    @('Stats','0.1.4','Stats_511681f5-d2f5-41ae-8b73-fa3adcc86c85','Extras','Stats'),
-    @('ScreenshotsGallery','0.1.1','ScreenshotsGallery_f3dc3fd5-3d6d-4aa0-8762-2d325bb1d7fe','Extras','Screenshots Gallery'),
-    @('GameGallery','2.0.5','GameGallery_8e77fe31-5e62-41e2-8fa2-64844cfd5b6b','Extras','Game Gallery'),
+    @('Stats','0.1.5','Stats_511681f5-d2f5-41ae-8b73-fa3adcc86c85','Extras','Stats'),
+    @('ScreenshotsGallery','0.1.3','ScreenshotsGallery_f3dc3fd5-3d6d-4aa0-8762-2d325bb1d7fe','Extras','Screenshots Gallery'),
+    @('GameGallery','2.0.6','GameGallery_8e77fe31-5e62-41e2-8fa2-64844cfd5b6b','Extras','Game Gallery'),
     @('Trophies','0.1.2','Trophies_72ba1fc9-490b-4fa4-96f0-0a154b56c1db','Extras','Trophies'),
-    @('Exophase','0.2.8','Exophase_26131977-669a-4ef7-a66c-026122a24089','Extras','Exophase'),
-    @('HowLongToBeat','1.2.5','HowLongToBeat_fba3e63d-d1a1-4b9d-91c6-091a1220377d','Extras','HowLongToBeat'),
+    @('Exophase','0.2.9','Exophase_26131977-669a-4ef7-a66c-026122a24089','Extras','Exophase'),
+    @('HowLongToBeat','1.2.6','HowLongToBeat_fba3e63d-d1a1-4b9d-91c6-091a1220377d','Extras','HowLongToBeat'),
     @('IgnMetadata','1.0.2','IgnMetadata_6024e3a9-de7e-4848-9101-7a2f818e7e47','Metadata','IGN Metadata'),
     @('SteamMetadata','1.0.1','UniversalSteamMetadata_f2db8fb1-4981-4dc4-b087-05c782215b72','Metadata','Steam Metadata'),
     @('SteamGridDBMetadataOsiris','1.0.1','SteamGridDBMetadata_8d89f55b-826c-43dc-8946-4038a6e182a2','Metadata','SteamGridDB Metadata'),

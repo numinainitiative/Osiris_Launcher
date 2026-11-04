@@ -9,7 +9,7 @@ using var theme = ModuleDefMD.Load(args[0]);
 using var module = ModuleDefMD.Load(args[1]);
 var page = args[2];
 var inspect = args.Contains("--inspect"); var verify = args.Contains("--verify");
-var bridge = theme.Types.Single(t => t.FullName == "OsirisTheme.EditionPageSharing");
+var bridge = theme.Types.Single(t => t.FullName == "OsirisTheme.EditionPageSharing" || t.FullName == "Osiris.Extensions.EditionMirrorBridge");
 var importer = new Importer(module);
 var resolveId = importer.Import(bridge.Methods.Single(m => m.Name == "ResolveOwner"));
 var resolveGame = importer.Import(bridge.Methods.Single(m => m.Name == "ResolveGame"));

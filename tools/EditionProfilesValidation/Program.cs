@@ -86,6 +86,21 @@ static class Program
         new Application();
         sandbox = Path.GetFullPath(args[3]);
         Directory.CreateDirectory(sandbox);
+        if (args.Length > 4)
+        {
+            var fixtures = JArray.Parse(File.ReadAllText(Path.Combine(args[4], "manifest.json")));
+            var helperPath = Path.Combine(Path.GetDirectoryName((string)fixtures[0]["Staged"]), "Osiris.EditionMirrorBridge.dll");
+            if (File.Exists(helperPath))
+            {
+                var bridge = Assembly.LoadFrom(helperPath).GetType("Osiris.Extensions.EditionMirrorBridge", true);
+                var uniqueId = Guid.NewGuid();
+                Check((Guid)bridge.GetMethod("ResolveOwner").Invoke(null, new object[] { uniqueId, "Media" }) == uniqueId,
+                    "Release bridge preserves independent IDs when optional host is absent");
+                var uniqueGame = new Game { Id = uniqueId };
+                Check(ReferenceEquals(bridge.GetMethod("ResolveGame").Invoke(null, new object[] { uniqueGame, "Gallery" }), uniqueGame),
+                    "Release bridge preserves original game when optional host is absent");
+            }
+        }
         theme = Assembly.LoadFrom(Path.GetFullPath(args[0]));
         editions = theme.GetType("OsirisTheme.GameEditions", true);
         var nativePaths = Assembly.LoadFrom(Path.Combine(args[1], "Playnite.dll")).GetType("Playnite.PlaynitePaths", true);

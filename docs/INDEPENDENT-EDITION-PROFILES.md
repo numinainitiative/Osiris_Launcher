@@ -317,3 +317,15 @@ Development restarted through its root wrapper with correct persistent Data,
 all twelve extensions and no core fatal/unhandled/startup errors. Personal theme
 remains `7028d37633763c89430882d121176649585991a154d47057b22091dc93473b18`.
 No personal files or public releases changed. Visual acceptance remains with user.
+
+## Beta 0.0.57 coordinated packages
+
+The Development-only adapter restriction above is addressed by the coordinated
+release: Game Gallery 2.0.6, Screenshots Gallery 0.1.3, Stats 0.1.5,
+HowLongToBeat 1.2.6, Exophase 0.2.9, with existing Trophies 0.1.2.
+Update Osiris first, then these extensions. Each compatibility package includes
+an optional reflection bridge preserving independent behaviour on older hosts.
+The Extensions repository records baseline provenance/hashes, bridge source and
+reproducible package transformation. No live extension installation is a build
+input; unrelated paused source changes remain excluded. All 138 release mirror
+checks and clean/0.0.56-upgrade/rollback qualification passed on 4 November 2026.
